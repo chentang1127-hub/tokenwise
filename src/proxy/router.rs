@@ -132,6 +132,10 @@ mod tests {
                 db_path: ":memory:".into(),
                 retention_days: 90,
             },
+            cache: crate::config::CacheConfig {
+                ttl_hours: 24,
+                max_entries: 10000,
+            },
             locale: "en".into(),
         }
     }

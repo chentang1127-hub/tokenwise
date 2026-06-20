@@ -32,6 +32,8 @@ struct DashboardTemplate {
     lang_toggle_label: &'static str,
     lang_toggle_url: &'static str,
     is_pro: bool,
+    cache_entries: i64,
+    cache_hits: i64,
 }
 
 #[derive(Template)]
@@ -68,6 +70,8 @@ struct DashboardTemplateCn {
     lang_toggle_label: &'static str,
     lang_toggle_url: &'static str,
     is_pro: bool,
+    cache_entries: i64,
+    cache_hits: i64,
 }
 
 #[derive(Template)]
@@ -168,6 +172,15 @@ async fn dashboard(
         })
         .collect();
 
+    let cache_stats = if is_pro {
+        state.store.cache_stats()
+    } else {
+        crate::recording::store::CacheStats {
+            total_entries: 0,
+            total_hits: 0,
+        }
+    };
+
     let (use_cn, lang_toggle_label, lang_toggle_url) = resolve_lang(&params, &state);
 
     if use_cn {
@@ -181,6 +194,8 @@ async fn dashboard(
             lang_toggle_label,
             lang_toggle_url,
             is_pro,
+            cache_entries: cache_stats.total_entries,
+            cache_hits: cache_stats.total_hits,
         };
         Html(
             template
@@ -198,6 +213,8 @@ async fn dashboard(
             lang_toggle_label,
             lang_toggle_url,
             is_pro,
+            cache_entries: cache_stats.total_entries,
+            cache_hits: cache_stats.total_hits,
         };
         Html(
             template

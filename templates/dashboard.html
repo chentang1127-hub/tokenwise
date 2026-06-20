@@ -81,6 +81,16 @@
       <div class="value purple">{{ savings_pct }}</div>
     </div>
     {% endif %}
+    {% if is_pro %}
+    <div class="kpi">
+      <div class="label">Cache Entries</div>
+      <div class="value">{{ cache_entries }}</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Cache Hits</div>
+      <div class="value blue">{{ cache_hits }}</div>
+    </div>
+    {% endif %}
   </div>
 
   {% if !is_pro %}

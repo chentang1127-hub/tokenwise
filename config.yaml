@@ -97,6 +97,11 @@ license:
   key: ""
   # Leave empty for Free tier. Pro key unlocks smart routing + safety net.
 
+# Response cache (Pro feature: avoids repeat API calls for identical prompts)
+cache:
+  ttl_hours: 24       # Cache entries expire after 24 hours
+  max_entries: 10000   # Maximum cached responses
+
 # Storage
 storage:
   db_path: "./tokenwise.db"

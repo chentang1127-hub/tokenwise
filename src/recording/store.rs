@@ -64,6 +64,18 @@ impl Store {
                 total_cost_usd     REAL NOT NULL DEFAULT 0.0,
                 estimated_savings_usd REAL NOT NULL DEFAULT 0.0
             );
+
+            CREATE TABLE IF NOT EXISTS cache (
+                hash               TEXT PRIMARY KEY,
+                response_json      TEXT NOT NULL,
+                model              TEXT NOT NULL,
+                prompt_tokens      INTEGER NOT NULL DEFAULT 0,
+                completion_tokens  INTEGER NOT NULL DEFAULT 0,
+                created_at         INTEGER NOT NULL,
+                hit_count          INTEGER NOT NULL DEFAULT 1
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_cache_ts ON cache(created_at);
             ",
         )?;
 
@@ -76,6 +88,84 @@ impl Store {
             let _ = conn.execute(col_sql, []);
         }
         Ok(())
+    }
+
+    // ── Response cache (Pro feature) ─────────────────
+
+    /// Check the cache for a matching prompt hash.
+    /// Returns the cached response JSON string if found and not expired.
+    pub fn cache_get(&self, hash: &str, ttl_hours: u32) -> Option<String> {
+        let conn = self.conn.lock().unwrap();
+        let cutoff = chrono::Utc::now().timestamp() - (ttl_hours as i64 * 3600);
+        let result: Option<String> = conn
+            .query_row(
+                "SELECT response_json FROM cache WHERE hash = ?1 AND created_at > ?2
+                 ORDER BY created_at DESC LIMIT 1",
+                rusqlite::params![hash, cutoff],
+                |row| row.get(0),
+            )
+            .ok()?;
+
+        // Increment hit count
+        if result.is_some() {
+            let _ = conn.execute(
+                "UPDATE cache SET hit_count = hit_count + 1 WHERE hash = ?1",
+                rusqlite::params![hash],
+            );
+        }
+        result
+    }
+
+    /// Store a response in the cache.
+    pub fn cache_put(
+        &self,
+        hash: &str,
+        response_json: &str,
+        model: &str,
+        prompt_tokens: u32,
+        completion_tokens: u32,
+        max_entries: u32,
+    ) {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().timestamp();
+
+        // Evict old entries if over capacity
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM cache", [], |row| row.get(0))
+            .unwrap_or(0);
+        if count >= max_entries as i64 {
+            // Remove oldest 10% of entries
+            let to_remove = (max_entries as f64 * 0.1) as i64 + 1;
+            let _ = conn.execute(
+                "DELETE FROM cache WHERE hash IN (SELECT hash FROM cache ORDER BY created_at ASC LIMIT ?1)",
+                rusqlite::params![to_remove],
+            );
+        }
+
+        // Upsert
+        let _ = conn.execute(
+            "INSERT OR REPLACE INTO cache (hash, response_json, model, prompt_tokens, completion_tokens, created_at, hit_count)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1)",
+            rusqlite::params![hash, response_json, model, prompt_tokens, completion_tokens, now],
+        );
+    }
+
+    /// Get cache statistics.
+    pub fn cache_stats(&self) -> CacheStats {
+        let conn = self.conn.lock().unwrap();
+        let total: i64 = conn
+            .query_row("SELECT COUNT(*) FROM cache", [], |row| row.get(0))
+            .unwrap_or(0);
+        let total_hits: i64 = conn
+            .query_row("SELECT COALESCE(SUM(hit_count), 0) FROM cache", [], |row| {
+                row.get(0)
+            })
+            .unwrap_or(0);
+        // Estimate savings: sum of (prompt_tokens * cheapest_rate) for cached entries
+        CacheStats {
+            total_entries: total,
+            total_hits,
+        }
     }
 
     /// Record a single API call.
@@ -198,6 +288,13 @@ impl Store {
 
         Ok(stats)
     }
+}
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct CacheStats {
+    pub total_entries: i64,
+    pub total_hits: i64,
 }
 
 #[derive(Debug, Clone)]

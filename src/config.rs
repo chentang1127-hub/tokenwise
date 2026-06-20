@@ -15,6 +15,8 @@ pub struct Config {
     pub safety_net: SafetyNetConfig,
     pub license: LicenseConfig,
     pub storage: StorageConfig,
+    #[serde(default)]
+    pub cache: CacheConfig,
     #[serde(default = "default_locale")]
     pub locale: String,
 }
@@ -75,6 +77,32 @@ pub struct LicenseConfig {
 pub struct StorageConfig {
     pub db_path: String,
     pub retention_days: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheConfig {
+    /// Hours before a cache entry expires (default 24).
+    #[serde(default = "default_cache_ttl")]
+    pub ttl_hours: u32,
+    /// Maximum cache entries (default 10,000).
+    #[serde(default = "default_cache_max")]
+    pub max_entries: u32,
+}
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self {
+            ttl_hours: 24,
+            max_entries: 10_000,
+        }
+    }
+}
+
+fn default_cache_ttl() -> u32 {
+    24
+}
+fn default_cache_max() -> u32 {
+    10_000
 }
 
 impl Config {

@@ -129,6 +129,46 @@ impl ProxyService {
             (passthrough, original_model.to_string(), false)
         };
 
+        // Compute cache key from messages + model (Pro feature)
+        let is_stream = request_json
+            .get("stream")
+            .and_then(|s| s.as_bool())
+            .unwrap_or(false);
+
+        let cache_hash = if self.routing_enabled && !is_stream {
+            let messages_str = serde_json::to_string(&messages).unwrap_or_default();
+            let cache_input = format!("{}:{}", routed_model_id, messages_str);
+            Some(CallRecord::hash_prompt(&cache_input))
+        } else {
+            None
+        };
+
+        // Check cache (Pro only, non-streaming only)
+        if let Some(ref hash) = cache_hash
+            && let Some(cached_json) = self.store.cache_get(hash, self.cfg.cache.ttl_hours)
+        {
+            let cached_bytes = Bytes::from(cached_json);
+            let latency_ms = start.elapsed().as_millis() as u64;
+            debug!("Cache HIT ({latency_ms}ms) — saved an API call");
+
+            // Record as a synthetic call so it's counted
+            let rec = CallRecord::from_request(
+                &routed_model_id,
+                &actual_route.provider,
+                complexity.tier_name(),
+                false,
+                latency_ms,
+            );
+            let _ = self.store.record_call(&rec, &request_json);
+
+            return Ok(Response::builder()
+                .status(StatusCode::OK)
+                .body(BoxBody::new(
+                    Full::new(cached_bytes).map_err(|e: Infallible| match e {}),
+                ))
+                .unwrap());
+        }
+
         // Build upstream request body
         let mut upstream_json = request_json.clone();
         upstream_json["model"] = serde_json::Value::String(routed_model_id.clone());
@@ -153,12 +193,6 @@ impl ProxyService {
         };
 
         let status = upstream_response.status();
-
-        // Check if streaming
-        let is_stream = request_json
-            .get("stream")
-            .and_then(|s| s.as_bool())
-            .unwrap_or(false);
 
         if is_stream {
             // Set up tee stream + analyzer
@@ -304,6 +338,20 @@ impl ProxyService {
             }
 
             let _ = self.store.record_call(&rec, &request_json);
+
+            // Cache the response for Pro users (non-streaming only)
+            if let Some(ref hash) = cache_hash
+                && let Ok(resp_str) = std::str::from_utf8(&resp_bytes)
+            {
+                self.store.cache_put(
+                    hash,
+                    resp_str,
+                    &routed_model_id,
+                    rec.prompt_tokens,
+                    rec.completion_tokens,
+                    self.cfg.cache.max_entries,
+                );
+            }
 
             Ok(Response::builder()
                 .status(resp_status)
