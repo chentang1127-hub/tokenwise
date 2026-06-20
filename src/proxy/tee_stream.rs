@@ -98,10 +98,9 @@ pub fn spawn_analyzer() -> (mpsc::UnboundedSender<Bytes>, JoinHandle<StreamMetri
                         .and_then(|c| c.get("delta"))
                         .and_then(|d| d.get("content"))
                         .and_then(|c| c.as_str())
+                        && local.content_preview.len() < 200
                     {
-                        if local.content_preview.len() < 200 {
-                            local.content_preview.push_str(delta);
-                        }
+                        local.content_preview.push_str(delta);
                     }
 
                     // Extract usage (usually in last chunk)

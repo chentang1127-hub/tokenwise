@@ -21,6 +21,7 @@ pub fn make_router(state: Arc<AppState>) -> Router {
 
 #[derive(Template)]
 #[template(path = "dashboard.html")]
+#[allow(dead_code)]
 struct DashboardTemplate {
     total_calls: i64,
     month_cost: String,
@@ -48,6 +49,7 @@ struct SavingsTemplate {
 
 #[derive(Template)]
 #[template(path = "cn/dashboard.html")]
+#[allow(dead_code)]
 struct DashboardTemplateCn {
     total_calls: i64,
     month_cost: String,

@@ -59,10 +59,10 @@ async fn main() {
     let mut cli = Cli::parse();
 
     // --market cn is shorthand for --config config.cn.yaml
-    if let Some(ref market) = cli.market {
-        if market == "cn" || market == "zh" {
-            cli.config = "config.cn.yaml".to_string();
-        }
+    if let Some(ref market) = cli.market
+        && (market == "cn" || market == "zh")
+    {
+        cli.config = "config.cn.yaml".to_string();
     }
 
     // Load config
@@ -83,14 +83,14 @@ async fn main() {
             info!("Free tier: safety net disabled (Pro feature)");
             cfg.safety_net.enabled = false;
         }
-        if let Some(max) = license_tier.max_providers() {
-            if cfg.providers.len() > max {
-                warn!(
-                    "Free tier limited to {max} providers. Truncating from {} to {max}.",
-                    cfg.providers.len()
-                );
-                cfg.providers.truncate(max);
-            }
+        if let Some(max) = license_tier.max_providers()
+            && cfg.providers.len() > max
+        {
+            warn!(
+                "Free tier limited to {max} providers. Truncating from {} to {max}.",
+                cfg.providers.len()
+            );
+            cfg.providers.truncate(max);
         }
     }
 
@@ -165,10 +165,9 @@ async fn main() {
                     if let Err(e) = hyper::server::conn::http1::Builder::new()
                         .serve_connection(hyper_util::rt::TokioIo::new(stream), svc)
                         .await
+                        && !e.to_string().contains("connection reset")
                     {
-                        if !e.to_string().contains("connection reset") {
-                            error!("Proxy connection error: {e}");
-                        }
+                        error!("Proxy connection error: {e}");
                     }
                 });
             }

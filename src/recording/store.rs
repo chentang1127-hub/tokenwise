@@ -112,6 +112,7 @@ impl Store {
     }
 
     /// Get total calls for today.
+    #[allow(dead_code)]
     pub fn today_call_count(&self) -> Result<i64, Box<dyn std::error::Error>> {
         let conn = self.conn.lock().unwrap();
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
@@ -179,6 +180,7 @@ impl Store {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct MonthlyStats {
     pub total_calls: i64,
     pub total_prompt_tokens: i64,

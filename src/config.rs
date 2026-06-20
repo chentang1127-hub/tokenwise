@@ -95,6 +95,7 @@ impl Config {
     }
 
     /// Get a provider by name.
+    #[allow(dead_code)]
     pub fn provider(&self, name: &str) -> Option<&ProviderConfig> {
         self.providers.iter().find(|p| p.name == name)
     }

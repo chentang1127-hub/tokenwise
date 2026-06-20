@@ -10,6 +10,7 @@ pub fn compute_cost(prompt_tokens: u32, completion_tokens: u32, model: &ModelCon
 }
 
 /// Estimate savings: what if this call used the most expensive model instead?
+#[allow(dead_code)]
 pub fn estimate_savings(
     prompt_tokens: u32,
     completion_tokens: u32,
@@ -44,6 +45,7 @@ pub fn format_usd(cost: f64) -> String {
 }
 
 /// Savings percentage string.
+#[allow(dead_code)]
 pub fn savings_pct(estimated_savings: f64, actual_cost: f64) -> String {
     if actual_cost <= 0.0 {
         return "N/A".to_string();

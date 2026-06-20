@@ -142,12 +142,9 @@ impl ProxyService {
 
             // Convert TeeStream into an http_body Body by mapping items to frames
             let body_stream = tee.map(|result| {
-                result
-                    .map(|bytes| http_body::Frame::data(bytes))
-                    .map_err(|s| {
-                        Box::new(std::io::Error::new(std::io::ErrorKind::Other, s))
-                            as Box<dyn std::error::Error + Send + Sync>
-                    })
+                result.map(http_body::Frame::data).map_err(|s| {
+                    Box::new(std::io::Error::other(s)) as Box<dyn std::error::Error + Send + Sync>
+                })
             });
             let stream_body = StreamBody::new(body_stream);
             let boxed = BoxBody::new(
@@ -217,31 +214,31 @@ impl ProxyService {
                 latency_ms,
             );
 
-            if let Ok(response_json) = serde_json::from_slice::<serde_json::Value>(&resp_bytes) {
-                if let Some(usage) = response_json.get("usage") {
-                    let prompt = usage
-                        .get("prompt_tokens")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0) as u32;
-                    let completion = usage
-                        .get("completion_tokens")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0) as u32;
-                    rec = rec.with_usage(prompt, completion);
+            if let Ok(response_json) = serde_json::from_slice::<serde_json::Value>(&resp_bytes)
+                && let Some(usage) = response_json.get("usage")
+            {
+                let prompt = usage
+                    .get("prompt_tokens")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u32;
+                let completion = usage
+                    .get("completion_tokens")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u32;
+                rec = rec.with_usage(prompt, completion);
 
-                    // Compute actual cost from model pricing
-                    if let Some(model_cfg) = self
-                        .cfg
-                        .model_config(&actual_route.provider, &actual_route.model)
-                    {
-                        rec.cost_usd =
-                            crate::cost::calculator::compute_cost(prompt, completion, model_cfg);
-                    }
-                    debug!(
-                        "Usage: prompt={prompt}, completion={completion}, cost=${:.6}",
-                        rec.cost_usd
-                    );
+                // Compute actual cost from model pricing
+                if let Some(model_cfg) = self
+                    .cfg
+                    .model_config(&actual_route.provider, &actual_route.model)
+                {
+                    rec.cost_usd =
+                        crate::cost::calculator::compute_cost(prompt, completion, model_cfg);
                 }
+                debug!(
+                    "Usage: prompt={prompt}, completion={completion}, cost=${:.6}",
+                    rec.cost_usd
+                );
             }
 
             let _ = self.store.record_call(&rec, &request_json);
@@ -328,31 +325,31 @@ impl ProxyService {
                     route.model
                 );
 
-                if self.cfg.safety_net.enabled {
-                    if let Some(fb_route) = fallback_route(&route.tier, &self.cfg) {
-                        let fb_url = format!("{}/chat/completions", fb_route.base_url);
-                        let fb_req = self
-                            .client
-                            .post(&fb_url)
-                            .header("Authorization", format!("Bearer {}", fb_route.api_key))
-                            .header("Content-Type", "application/json")
-                            .body(body.to_vec());
+                if self.cfg.safety_net.enabled
+                    && let Some(fb_route) = fallback_route(&route.tier, &self.cfg)
+                {
+                    let fb_url = format!("{}/chat/completions", fb_route.base_url);
+                    let fb_req = self
+                        .client
+                        .post(&fb_url)
+                        .header("Authorization", format!("Bearer {}", fb_route.api_key))
+                        .header("Content-Type", "application/json")
+                        .body(body.to_vec());
 
-                        match fb_req.send().await {
-                            Ok(fb_resp) => {
-                                info!(
-                                    "Fallback to {} succeeded after connection error",
-                                    fb_route.model
-                                );
-                                return (Ok(fb_resp), fb_route, true);
-                            }
-                            Err(fb_e) => {
-                                return (
-                                    Err(format!("Both primary and fallback failed: {e} / {fb_e}")),
-                                    fb_route,
-                                    true,
-                                );
-                            }
+                    match fb_req.send().await {
+                        Ok(fb_resp) => {
+                            info!(
+                                "Fallback to {} succeeded after connection error",
+                                fb_route.model
+                            );
+                            return (Ok(fb_resp), fb_route, true);
+                        }
+                        Err(fb_e) => {
+                            return (
+                                Err(format!("Both primary and fallback failed: {e} / {fb_e}")),
+                                fb_route,
+                                true,
+                            );
                         }
                     }
                 }

@@ -35,6 +35,7 @@ pub enum LicenseTier {
 
 impl LicenseTier {
     /// Whether safety net fallback is enabled.
+    #[allow(dead_code)]
     pub fn safety_net_enabled(&self) -> bool {
         matches!(self, LicenseTier::Pro { .. })
     }

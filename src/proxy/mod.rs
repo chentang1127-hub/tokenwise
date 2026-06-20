@@ -17,6 +17,7 @@ use crate::config::Config;
 use crate::recording::Store;
 
 /// Build the hyper service that handles all incoming proxy requests.
+#[allow(clippy::type_complexity)]
 pub fn build_service(
     cfg: Arc<Config>,
     store: Arc<Store>,

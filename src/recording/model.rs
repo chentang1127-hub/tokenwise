@@ -15,6 +15,7 @@ pub struct CallRecord {
     pub cost_usd: f64,
     pub latency_ms: u64,
     pub fallback_used: bool,
+    #[allow(dead_code)]
     pub prompt_hash: String,
     pub finish_reason: Option<String>,
 }
@@ -59,6 +60,7 @@ impl CallRecord {
     }
 
     /// Set the prompt hash.
+    #[allow(dead_code)]
     pub fn with_prompt(self, prompt: &str) -> Self {
         let mut this = self;
         this.prompt_hash = Self::hash_prompt(prompt);
