@@ -21,17 +21,29 @@ After:   Your App ──→ TokenWise ──→ deepseek-chat  ($0.0003/1K)  sim
 ### 1. Download
 
 ```bash
-# macOS / Linux
-curl -fsSL https://github.com/chentang1127-hub/tokenwise/releases/latest/download/tokenwise-x86_64-unknown-linux-gnu.tar.gz | tar xz
+# Homebrew (macOS / Linux)
+brew tap chentang1127-hub/tap
+brew install tokenwise
+tokenwise start
+
+# Or download manually:
+# macOS ARM64 (Apple Silicon)
+curl -fsSL https://github.com/chentang1127-hub/tokenwise/releases/latest/download/tokenwise-macos-arm64.tar.gz | tar xz
+./tokenwise start
+
+# macOS x86_64 / Linux x86_64
+curl -fsSL https://github.com/chentang1127-hub/tokenwise/releases/latest/download/tokenwise-linux-amd64.tar.gz | tar xz
 ./tokenwise start
 
 # Windows (PowerShell)
-Invoke-WebRequest -Uri "https://github.com/chentang1127-hub/tokenwise/releases/latest/download/tokenwise-x86_64-pc-windows-gnu.zip" -OutFile tokenwise.zip
+Invoke-WebRequest -Uri "https://github.com/chentang1127-hub/tokenwise/releases/latest/download/tokenwise-windows-amd64.zip" -OutFile tokenwise.zip
 Expand-Archive tokenwise.zip
 .\tokenwise\tokenwise.exe start
 
 # Docker
-docker run -p 9400:9400 -p 9401:9401 -e DEEPSEEK_API_KEY=sk-... ghcr.io/tokenwise/tokenwise:latest
+docker run -p 9400:9400 -p 9401:9401 \
+  -e DEEPSEEK_API_KEY=sk-... \
+  ghcr.io/chentang1127-hub/tokenwise:latest
 
 # Build from source
 git clone https://github.com/chentang1127-hub/tokenwise
