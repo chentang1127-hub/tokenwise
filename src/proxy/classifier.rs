@@ -93,10 +93,25 @@ pub fn classify(
 /// Detect code-related patterns in the prompt.
 fn has_code_patterns(text: &str) -> bool {
     let code_markers = [
-        "```", "fn ", "def ", "function ", "class ", "import ",
-        "pub fn", "let mut", "const ", "var ", "func ",
-        "package ", "#include", "console.log", "print(",
-        "struct ", "impl ", "trait ", "enum ",
+        "```",
+        "fn ",
+        "def ",
+        "function ",
+        "class ",
+        "import ",
+        "pub fn",
+        "let mut",
+        "const ",
+        "var ",
+        "func ",
+        "package ",
+        "#include",
+        "console.log",
+        "print(",
+        "struct ",
+        "impl ",
+        "trait ",
+        "enum ",
     ];
     let mut matches = 0;
     for marker in &code_markers {
@@ -113,11 +128,29 @@ fn has_code_patterns(text: &str) -> bool {
 /// Detect multi-step instructions.
 fn has_multi_step(text: &str) -> bool {
     let step_markers = [
-        "step 1", "step 2", "first", "second", "third",
-        "firstly", "secondly", "finally", "then",
-        "1.", "2.", "3.", "1)", "2)", "3)",
-        "第一步", "第二步", "首先", "然后", "最后",
-        "你需要", "请按照", "请根据以下步骤",
+        "step 1",
+        "step 2",
+        "first",
+        "second",
+        "third",
+        "firstly",
+        "secondly",
+        "finally",
+        "then",
+        "1.",
+        "2.",
+        "3.",
+        "1)",
+        "2)",
+        "3)",
+        "第一步",
+        "第二步",
+        "首先",
+        "然后",
+        "最后",
+        "你需要",
+        "请按照",
+        "请根据以下步骤",
     ];
     let mut matches = 0;
     for marker in &step_markers {
@@ -144,10 +177,24 @@ fn is_simple_question(text: &str, char_count: usize) -> bool {
     // Check for simple question patterns
     let lowered = text.to_lowercase();
     let question_starters = [
-        "what is", "what are", "who is", "where is", "when did",
-        "how many", "how much", "which", "define",
-        "什么是", "谁", "哪里", "什么时候", "怎么读",
-        "翻译", "capital of", "translate", "say hello",
+        "what is",
+        "what are",
+        "who is",
+        "where is",
+        "when did",
+        "how many",
+        "how much",
+        "which",
+        "define",
+        "什么是",
+        "谁",
+        "哪里",
+        "什么时候",
+        "怎么读",
+        "翻译",
+        "capital of",
+        "translate",
+        "say hello",
     ];
     for starter in &question_starters {
         if lowered.contains(starter) {
@@ -259,7 +306,9 @@ mod tests {
     #[test]
     fn test_multi_step_is_complex() {
         let cfg = test_config();
-        let msgs = vec![msg("First, install Python. Second, create a virtual environment. Then install dependencies.")];
+        let msgs = vec![msg(
+            "First, install Python. Second, create a virtual environment. Then install dependencies.",
+        )];
         assert_eq!(classify(&msgs, None, &cfg), Complexity::Complex);
     }
 
