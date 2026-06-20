@@ -99,6 +99,20 @@ impl Config {
         self.providers.iter().find(|p| p.name == name)
     }
 
+    /// Find a model config by provider name and model ID.
+    pub fn model_config(&self, provider_name: &str, model_id: &str) -> Option<&ModelConfig> {
+        for p in &self.providers {
+            if p.name == provider_name {
+                for m in &p.models {
+                    if m.id == model_id {
+                        return Some(m);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Find the cheapest model in a given tier.
     pub fn cheapest_model_in_tier(&self, tier: &str) -> Option<(&ProviderConfig, &ModelConfig)> {
         let mut best: Option<(&ProviderConfig, &ModelConfig, f64)> = None;

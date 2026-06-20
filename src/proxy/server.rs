@@ -94,9 +94,14 @@ impl ProxyService {
 
         let primary_route = route(complexity, &self.cfg);
 
+        // Rewrite model in request body to the routed model
+        let mut upstream_json = request_json.clone();
+        upstream_json["model"] = serde_json::Value::String(primary_route.model.clone());
+        let upstream_body = serde_json::to_vec(&upstream_json).unwrap_or_else(|_| body_bytes.to_vec());
+
         // Make upstream request (with optional fallback)
         let (response, actual_route, fallback_used) = self
-            .try_upstream(&body_bytes, &primary_route)
+            .try_upstream(&upstream_body, &primary_route)
             .await;
 
         let latency_ms = start.elapsed().as_millis() as u64;
@@ -135,6 +140,7 @@ impl ProxyService {
 
             // Spawn recording task — awaits analyzer completion so token counts are real
             let store = self.store.clone();
+            let cfg = self.cfg.clone();
             let request_json_clone = request_json.clone();
             let model = actual_route.model.clone();
             let provider = actual_route.provider.clone();
@@ -144,21 +150,25 @@ impl ProxyService {
                 // This resolves only after TeeStream is dropped (client consumed all chunks)
                 // and the analyzer has finished processing every chunk.
                 let metrics = analyzer_handle.await.unwrap_or_default();
+                let prompt = metrics.prompt_tokens.unwrap_or(0);
+                let completion = metrics.completion_tokens.unwrap_or(0);
 
-                let rec = CallRecord::from_request(
+                let mut rec = CallRecord::from_request(
                     &model,
                     &provider,
                     &complexity_name,
                     fallback_used,
                     latency_ms,
                 )
-                .with_usage(
-                    metrics.prompt_tokens.unwrap_or(0),
-                    metrics.completion_tokens.unwrap_or(0),
-                );
+                .with_usage(prompt, completion);
+
+                // Compute actual cost from model pricing
+                if let Some(model_cfg) = cfg.model_config(&provider, &model) {
+                    rec.cost_usd = crate::cost::calculator::compute_cost(prompt, completion, model_cfg);
+                }
 
                 if let Some(ref reason) = metrics.finish_reason {
-                    let _ = reason; // recorded in a future schema migration
+                    let _ = reason;
                 }
 
                 if let Err(e) = store.record_call(&rec, &request_json_clone) {
@@ -180,20 +190,28 @@ impl ProxyService {
                 }
             };
 
-            // Extract usage from response for better tracking
-            if let Ok(response_json) = serde_json::from_slice::<serde_json::Value>(&resp_bytes) {
-                if let Some(usage) = response_json.get("usage") {
-                    debug!("Usage: {:?}", usage);
-                }
-            }
-
-            let rec = CallRecord::from_request(
+            // Extract usage and compute cost
+            let mut rec = CallRecord::from_request(
                 &actual_route.model,
                 &actual_route.provider,
                 complexity.tier_name(),
                 fallback_used,
                 latency_ms,
             );
+
+            if let Ok(response_json) = serde_json::from_slice::<serde_json::Value>(&resp_bytes) {
+                if let Some(usage) = response_json.get("usage") {
+                    let prompt = usage.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                    let completion = usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                    rec = rec.with_usage(prompt, completion);
+
+                    // Compute actual cost from model pricing
+                    if let Some(model_cfg) = self.cfg.model_config(&actual_route.provider, &actual_route.model) {
+                        rec.cost_usd = crate::cost::calculator::compute_cost(prompt, completion, model_cfg);
+                    }
+                    debug!("Usage: prompt={prompt}, completion={completion}, cost=${:.6}", rec.cost_usd);
+                }
+            }
 
             let _ = self.store.record_call(&rec, &request_json);
 
