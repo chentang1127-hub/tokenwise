@@ -119,6 +119,12 @@ async fn main() {
             info!("   Proxy: http://{}", cfg.proxy.listen);
             info!("   Dashboard: http://{}", cfg.proxy.admin);
             info!("   License: {} tier", license_tier.name());
+            if !license_tier.routing_enabled() {
+                info!(
+                    "   💡 Free tier: pass-through mode — no smart routing. \
+                     Pro saves 70-90% on API calls."
+                );
+            }
 
             // Initialize recording store
             let store = recording::Store::new(&cfg.storage.db_path)
@@ -126,9 +132,11 @@ async fn main() {
             let store = Arc::new(store);
 
             // Build shared app state
+            let routing_enabled = license_tier.routing_enabled();
             let state = Arc::new(admin::AppState {
                 config: cfg.clone(),
                 store: store.clone(),
+                routing_enabled,
             });
 
             // Spawn the admin dashboard on its own task
@@ -156,7 +164,7 @@ async fn main() {
             let listener = TcpListener::bind(proxy_addr).await.unwrap();
             info!("🔀 Proxy listening on http://{}", proxy_addr);
 
-            let proxy_service = proxy::build_service(cfg, store);
+            let proxy_service = proxy::build_service(cfg, store, routing_enabled);
 
             loop {
                 let (stream, _) = listener.accept().await.unwrap();

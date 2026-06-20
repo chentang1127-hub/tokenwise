@@ -48,6 +48,12 @@ impl LicenseTier {
         }
     }
 
+    /// Whether smart routing is enabled (Pro only).
+    /// Free tier passes through to the original model without rewriting.
+    pub fn routing_enabled(&self) -> bool {
+        matches!(self, LicenseTier::Pro { .. })
+    }
+
     /// Tier name for display.
     pub fn name(&self) -> &'static str {
         match self {

@@ -44,11 +44,19 @@
     <h3>本月 API 费用</h3>
     <div class="big">{{ month_cost }}</div>
   </div>
+  {% if is_pro %}
   <div class="card">
-    <h3>预估节省金额</h3>
+    <h3>已节省金额 (Pro 路由)</h3>
     <div class="big green">{{ estimated_savings }}</div>
-    <div class="sub">相当于只用 GPT-4.1 时的 {{ savings_pct }} 费用</div>
+    <div class="sub">相比只用 GPT-4.1，节省了 {{ savings_pct }} 费用</div>
   </div>
+  {% else %}
+  <div class="card">
+    <h3>升级 Pro 可节省</h3>
+    <div class="big green">{{ estimated_savings }}</div>
+    <div class="sub">升级 Pro 后可节省当前费用的 {{ savings_pct }}</div>
+  </div>
+  {% endif %}
 
   <div class="how-it-works">
     <h2>TokenWise 如何帮你省钱</h2>

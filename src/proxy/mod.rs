@@ -21,6 +21,7 @@ use crate::recording::Store;
 pub fn build_service(
     cfg: Arc<Config>,
     store: Arc<Store>,
+    routing_enabled: bool,
 ) -> impl Service<
     hyper::Request<Incoming>,
     Response = hyper::Response<BoxBody<Bytes, String>>,
@@ -33,5 +34,5 @@ pub fn build_service(
         >,
     >,
 > + Clone {
-    server::ProxyService::new(cfg, store)
+    server::ProxyService::new(cfg, store, routing_enabled)
 }

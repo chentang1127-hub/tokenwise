@@ -31,6 +31,7 @@ impl Store {
     }
 
     fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
+        // Main schema — create tables if they don't exist
         conn.execute_batch(
             "
             CREATE TABLE IF NOT EXISTS calls (
@@ -45,7 +46,10 @@ impl Store {
                 latency_ms      INTEGER NOT NULL DEFAULT 0,
                 fallback_used   INTEGER NOT NULL DEFAULT 0,
                 prompt_hash     TEXT NOT NULL DEFAULT '',
-                finish_reason   TEXT
+                finish_reason   TEXT,
+                was_routed      INTEGER NOT NULL DEFAULT 0,
+                recommended_model TEXT,
+                estimated_optimal_cost REAL
             );
 
             CREATE INDEX IF NOT EXISTS idx_calls_ts ON calls(timestamp);
@@ -62,6 +66,15 @@ impl Store {
             );
             ",
         )?;
+
+        // v0.1.0 → v0.1.1 column additions (ignore errors if already present)
+        for col_sql in [
+            "ALTER TABLE calls ADD COLUMN was_routed INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE calls ADD COLUMN recommended_model TEXT",
+            "ALTER TABLE calls ADD COLUMN estimated_optimal_cost REAL",
+        ] {
+            let _ = conn.execute(col_sql, []);
+        }
         Ok(())
     }
 
@@ -88,8 +101,8 @@ impl Store {
         let prompt_hash = CallRecord::hash_prompt(&prompt_text);
 
         conn.execute(
-            "INSERT INTO calls (id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            "INSERT INTO calls (id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason, was_routed, recommended_model, estimated_optimal_cost)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             rusqlite::params![
                 rec.id,
                 rec.timestamp,
@@ -103,6 +116,9 @@ impl Store {
                 rec.fallback_used as i32,
                 prompt_hash,
                 rec.finish_reason,
+                rec.was_routed as i32,
+                rec.recommended_model,
+                rec.estimated_optimal_cost,
             ],
         )?;
 
@@ -131,7 +147,7 @@ impl Store {
     ) -> Result<Vec<CallRecord>, Box<dyn std::error::Error>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason
+            "SELECT id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason, was_routed, recommended_model, estimated_optimal_cost
              FROM calls ORDER BY timestamp DESC LIMIT ?1",
         )?;
 
@@ -149,6 +165,9 @@ impl Store {
                 fallback_used: row.get::<_, i32>(9)? != 0,
                 prompt_hash: row.get(10)?,
                 finish_reason: row.get(11)?,
+                was_routed: row.get::<_, i32>(12)? != 0,
+                recommended_model: row.get(13)?,
+                estimated_optimal_cost: row.get(14)?,
             })
         })?;
 
@@ -161,7 +180,8 @@ impl Store {
         let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
 
         let stats = conn.query_row(
-            "SELECT COUNT(*), COALESCE(SUM(prompt_tokens), 0), COALESCE(SUM(completion_tokens), 0), COALESCE(SUM(cost_usd), 0.0), COALESCE(AVG(latency_ms), 0)
+            "SELECT COUNT(*), COALESCE(SUM(prompt_tokens), 0), COALESCE(SUM(completion_tokens), 0), COALESCE(SUM(cost_usd), 0.0), COALESCE(AVG(latency_ms), 0),
+                    COALESCE(SUM(CASE WHEN was_routed = 0 AND estimated_optimal_cost IS NOT NULL THEN cost_usd - estimated_optimal_cost ELSE 0 END), 0.0)
              FROM calls WHERE date(timestamp, 'unixepoch') >= ?1",
             rusqlite::params![month_start],
             |row| {
@@ -171,6 +191,7 @@ impl Store {
                     total_completion_tokens: row.get(2)?,
                     total_cost: row.get(3)?,
                     avg_latency_ms: row.get(4)?,
+                    potential_savings: row.get(5)?,
                 })
             },
         )?;
@@ -187,6 +208,8 @@ pub struct MonthlyStats {
     pub total_completion_tokens: i64,
     pub total_cost: f64,
     pub avg_latency_ms: f64,
+    /// What Free-tier users could save with Pro routing.
+    pub potential_savings: f64,
 }
 
 #[cfg(test)]

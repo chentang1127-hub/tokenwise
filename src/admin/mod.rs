@@ -13,6 +13,7 @@ use crate::recording::Store;
 pub struct AppState {
     pub config: Arc<Config>,
     pub store: Arc<Store>,
+    pub routing_enabled: bool,
 }
 
 /// Build the admin router.

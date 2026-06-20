@@ -28,16 +28,23 @@ pub struct ProxyService {
     cfg: Arc<Config>,
     store: Arc<Store>,
     client: reqwest::Client,
+    /// Whether smart routing is enabled (Pro feature).
+    routing_enabled: bool,
 }
 
 impl ProxyService {
-    pub fn new(cfg: Arc<Config>, store: Arc<Store>) -> Self {
+    pub fn new(cfg: Arc<Config>, store: Arc<Store>, routing_enabled: bool) -> Self {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(cfg.proxy.timeout_secs))
             .build()
             .expect("Failed to create HTTP client");
 
-        Self { cfg, store, client }
+        Self {
+            cfg,
+            store,
+            client,
+            routing_enabled,
+        }
     }
 
     /// Helper: create a JSON error response.
@@ -97,21 +104,40 @@ impl ProxyService {
             .cloned()
             .unwrap_or_default();
 
-        // Classify complexity → route
+        // Classify complexity
         let complexity = classify(&messages, None, &self.cfg.routing);
         debug!("Classified as {:?}", complexity);
 
-        let primary_route = route(complexity, &self.cfg);
+        // Compute the recommended route (what Pro would use)
+        let recommended_route = route(complexity, &self.cfg);
+        let recommended_provider = recommended_route.provider.clone();
+        let recommended_model_id = recommended_route.model.clone();
 
-        // Rewrite model in request body to the routed model
+        // Determine the actual route to use
+        let (actual_route, routed_model_id, was_routed) = if self.routing_enabled {
+            // Pro: rewrite model to the cheapest capable one
+            let model = recommended_route.model.clone();
+            (recommended_route, model, true)
+        } else {
+            // Free: keep the original requested model — passthrough
+            let original_model = request_json
+                .get("model")
+                .and_then(|m| m.as_str())
+                .unwrap_or("deepseek-chat");
+            // Build a route that resolves the original model to a provider
+            let passthrough = self.resolve_original_route(original_model);
+            (passthrough, original_model.to_string(), false)
+        };
+
+        // Build upstream request body
         let mut upstream_json = request_json.clone();
-        upstream_json["model"] = serde_json::Value::String(primary_route.model.clone());
+        upstream_json["model"] = serde_json::Value::String(routed_model_id.clone());
         let upstream_body =
             serde_json::to_vec(&upstream_json).unwrap_or_else(|_| body_bytes.to_vec());
 
         // Make upstream request (with optional fallback)
         let (response, actual_route, fallback_used) =
-            self.try_upstream(&upstream_body, &primary_route).await;
+            self.try_upstream(&upstream_body, &actual_route).await;
 
         let latency_ms = start.elapsed().as_millis() as u64;
 
@@ -159,6 +185,11 @@ impl ProxyService {
             let model = actual_route.model.clone();
             let provider = actual_route.provider.clone();
             let complexity_name = complexity.tier_name().to_string();
+            let recommended_model = if was_routed {
+                None
+            } else {
+                Some(format!("{}/{}", recommended_provider, recommended_model_id))
+            };
 
             tokio::spawn(async move {
                 // This resolves only after TeeStream is dropped (client consumed all chunks)
@@ -176,10 +207,23 @@ impl ProxyService {
                 )
                 .with_usage(prompt, completion);
 
+                rec.was_routed = was_routed;
+                rec.recommended_model = recommended_model;
+
                 // Compute actual cost from model pricing
                 if let Some(model_cfg) = cfg.model_config(&provider, &model) {
                     rec.cost_usd =
                         crate::cost::calculator::compute_cost(prompt, completion, model_cfg);
+                }
+
+                // For Free tier: compute what Pro would have cost
+                if !was_routed
+                    && let Some(opt_cfg) =
+                        cfg.model_config(&recommended_provider, &recommended_model_id)
+                {
+                    rec.estimated_optimal_cost = Some(crate::cost::calculator::compute_cost(
+                        prompt, completion, opt_cfg,
+                    ));
                 }
 
                 if let Some(ref reason) = metrics.finish_reason {
@@ -214,6 +258,12 @@ impl ProxyService {
                 latency_ms,
             );
 
+            rec.was_routed = was_routed;
+            if !was_routed {
+                rec.recommended_model =
+                    Some(format!("{}/{}", recommended_provider, recommended_model_id));
+            }
+
             if let Ok(response_json) = serde_json::from_slice::<serde_json::Value>(&resp_bytes)
                 && let Some(usage) = response_json.get("usage")
             {
@@ -235,6 +285,18 @@ impl ProxyService {
                     rec.cost_usd =
                         crate::cost::calculator::compute_cost(prompt, completion, model_cfg);
                 }
+
+                // For Free tier: compute what Pro would have cost
+                if !was_routed
+                    && let Some(opt_cfg) = self
+                        .cfg
+                        .model_config(&recommended_provider, &recommended_model_id)
+                {
+                    rec.estimated_optimal_cost = Some(crate::cost::calculator::compute_cost(
+                        prompt, completion, opt_cfg,
+                    ));
+                }
+
                 debug!(
                     "Usage: prompt={prompt}, completion={completion}, cost=${:.6}",
                     rec.cost_usd
@@ -249,6 +311,42 @@ impl ProxyService {
                     Full::new(resp_bytes).map_err(|e: Infallible| match e {}),
                 ))
                 .unwrap())
+        }
+    }
+
+    /// Resolve the original client-requested model to a provider route.
+    /// Used by Free tier (passthrough mode) to forward without model rewriting.
+    /// Falls back to first configured provider if model not found.
+    fn resolve_original_route(&self, original_model: &str) -> crate::proxy::router::Route {
+        // Try to find the model in any configured provider
+        for provider in &self.cfg.providers {
+            for model in &provider.models {
+                if model.id == original_model {
+                    let api_key = std::env::var(&provider.api_key_env).unwrap_or_default();
+                    return crate::proxy::router::Route {
+                        provider: provider.name.clone(),
+                        model: model.id.clone(),
+                        base_url: provider.base_url.clone(),
+                        api_key,
+                        tier: model.tier.clone(),
+                    };
+                }
+            }
+        }
+        // Model not found in config — use first available provider
+        let p = self.cfg.providers.first().expect("No providers configured");
+        let m = p.models.first().expect("No models configured for provider");
+        let api_key = std::env::var(&p.api_key_env).unwrap_or_default();
+        debug!(
+            "Model '{original_model}' not in config, routing via {}/{}",
+            p.name, m.id
+        );
+        crate::proxy::router::Route {
+            provider: p.name.clone(),
+            model: m.id.clone(),
+            base_url: p.base_url.clone(),
+            api_key,
+            tier: m.tier.clone(),
         }
     }
 

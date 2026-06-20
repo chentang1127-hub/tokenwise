@@ -31,6 +31,7 @@ struct DashboardTemplate {
     recent_calls: Vec<CallRow>,
     lang_toggle_label: &'static str,
     lang_toggle_url: &'static str,
+    is_pro: bool,
 }
 
 #[derive(Template)]
@@ -49,6 +50,7 @@ struct SavingsTemplate {
     savings_pct: String,
     lang_toggle_label: &'static str,
     lang_toggle_url: &'static str,
+    is_pro: bool,
 }
 
 // ── Chinese Templates ──────────────────────────────────
@@ -65,6 +67,7 @@ struct DashboardTemplateCn {
     recent_calls: Vec<CallRow>,
     lang_toggle_label: &'static str,
     lang_toggle_url: &'static str,
+    is_pro: bool,
 }
 
 #[derive(Template)]
@@ -83,6 +86,7 @@ struct SavingsTemplateCn {
     savings_pct: String,
     lang_toggle_label: &'static str,
     lang_toggle_url: &'static str,
+    is_pro: bool,
 }
 
 // ── Shared row type ────────────────────────────────────
@@ -125,16 +129,29 @@ async fn dashboard(
 ) -> Html<String> {
     let stats = state.store.monthly_stats().unwrap_or_default();
     let calls = state.store.recent_calls(20).unwrap_or_default();
+    let is_pro = state.routing_enabled;
 
-    // Estimate savings: assume ~5x savings vs all-premium routing
-    let estimated_savings = stats.total_cost * 5.0;
-    let savings_pct = if stats.total_cost > 0.0 {
-        format!(
-            "{:.0}%",
-            (estimated_savings / (stats.total_cost + estimated_savings)) * 100.0
-        )
+    // For Free tier: show potential savings from recorded estimates
+    // For Pro tier: show actual savings (total_cost * 5x baseline)
+    let (estimated_savings, savings_pct) = if is_pro {
+        let savings = stats.total_cost * 5.0;
+        let pct = if stats.total_cost > 0.0 {
+            format!("{:.0}%", (savings / (stats.total_cost + savings)) * 100.0)
+        } else {
+            "N/A".to_string()
+        };
+        (savings, pct)
     } else {
-        "N/A".to_string()
+        // Free tier: use computed potential_savings from DB
+        let pct = if stats.total_cost > 0.0 && stats.potential_savings > 0.0 {
+            format!(
+                "{:.0}%",
+                (stats.potential_savings / stats.total_cost) * 100.0
+            )
+        } else {
+            "N/A".to_string()
+        };
+        (stats.potential_savings, pct)
     };
 
     let total_calls = stats.total_calls;
@@ -163,6 +180,7 @@ async fn dashboard(
             recent_calls,
             lang_toggle_label,
             lang_toggle_url,
+            is_pro,
         };
         Html(
             template
@@ -179,6 +197,7 @@ async fn dashboard(
             recent_calls,
             lang_toggle_label,
             lang_toggle_url,
+            is_pro,
         };
         Html(
             template
@@ -235,14 +254,26 @@ async fn savings_page(
     Query(params): Query<HashMap<String, String>>,
 ) -> Html<String> {
     let stats = state.store.monthly_stats().unwrap_or_default();
-    let estimated_savings = stats.total_cost * 5.0;
-    let savings_pct = if stats.total_cost > 0.0 {
-        format!(
-            "{:.0}%",
-            (estimated_savings / (stats.total_cost + estimated_savings)) * 100.0
-        )
+    let is_pro = state.routing_enabled;
+
+    let (estimated_savings, savings_pct) = if is_pro {
+        let savings = stats.total_cost * 5.0;
+        let pct = if stats.total_cost > 0.0 {
+            format!("{:.0}%", (savings / (stats.total_cost + savings)) * 100.0)
+        } else {
+            "N/A".to_string()
+        };
+        (savings, pct)
     } else {
-        "N/A".to_string()
+        let pct = if stats.total_cost > 0.0 && stats.potential_savings > 0.0 {
+            format!(
+                "{:.0}%",
+                (stats.potential_savings / stats.total_cost) * 100.0
+            )
+        } else {
+            "N/A".to_string()
+        };
+        (stats.potential_savings, pct)
     };
 
     let month_cost = crate::cost::calculator::format_usd(stats.total_cost);
@@ -257,6 +288,7 @@ async fn savings_page(
             savings_pct,
             lang_toggle_label,
             lang_toggle_url,
+            is_pro,
         };
         Html(
             template
@@ -270,6 +302,7 @@ async fn savings_page(
             savings_pct,
             lang_toggle_label,
             lang_toggle_url,
+            is_pro,
         };
         Html(
             template
@@ -293,6 +326,7 @@ impl Default for crate::recording::store::MonthlyStats {
             total_completion_tokens: 0,
             total_cost: 0.0,
             avg_latency_ms: 0.0,
+            potential_savings: 0.0,
         }
     }
 }

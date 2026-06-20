@@ -18,6 +18,12 @@ pub struct CallRecord {
     #[allow(dead_code)]
     pub prompt_hash: String,
     pub finish_reason: Option<String>,
+    /// Whether smart routing was actually applied (Pro only).
+    pub was_routed: bool,
+    /// The model TokenWise would have routed to (shown in Free tier as savings tip).
+    pub recommended_model: Option<String>,
+    /// What the cost would have been with smart routing.
+    pub estimated_optimal_cost: Option<f64>,
 }
 
 impl CallRecord {
@@ -42,6 +48,9 @@ impl CallRecord {
             fallback_used,
             prompt_hash: String::new(),
             finish_reason: None,
+            was_routed: false,
+            recommended_model: None,
+            estimated_optimal_cost: None,
         }
     }
 
