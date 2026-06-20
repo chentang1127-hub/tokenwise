@@ -22,11 +22,11 @@ After:   Your App ──→ TokenWise ──→ deepseek-chat  ($0.0003/1K)  sim
 
 ```bash
 # macOS / Linux
-curl -fsSL https://github.com/tokenwise/tokenwise/releases/latest/download/tokenwise-x86_64-unknown-linux-gnu.tar.gz | tar xz
+curl -fsSL https://github.com/chentang1127-hub/tokenwise/releases/latest/download/tokenwise-x86_64-unknown-linux-gnu.tar.gz | tar xz
 ./tokenwise start
 
 # Windows (PowerShell)
-Invoke-WebRequest -Uri "https://github.com/tokenwise/tokenwise/releases/latest/download/tokenwise-x86_64-pc-windows-gnu.zip" -OutFile tokenwise.zip
+Invoke-WebRequest -Uri "https://github.com/chentang1127-hub/tokenwise/releases/latest/download/tokenwise-x86_64-pc-windows-gnu.zip" -OutFile tokenwise.zip
 Expand-Archive tokenwise.zip
 .\tokenwise\tokenwise.exe start
 
@@ -34,7 +34,7 @@ Expand-Archive tokenwise.zip
 docker run -p 9400:9400 -p 9401:9401 -e DEEPSEEK_API_KEY=sk-... ghcr.io/tokenwise/tokenwise:latest
 
 # Build from source
-git clone https://github.com/tokenwise/tokenwise
+git clone https://github.com/chentang1127-hub/tokenwise
 cd tokenwise
 cargo build --release
 ```
