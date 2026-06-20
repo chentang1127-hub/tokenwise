@@ -35,7 +35,9 @@ pub fn estimate_savings(
 
 /// Format cost as USD string.
 pub fn format_usd(cost: f64) -> String {
-    if cost < 0.01 {
+    if cost <= 0.0 {
+        "$0.00".to_string()
+    } else if cost < 0.01 {
         format!("${:.6}", cost)
     } else if cost < 1.0 {
         format!("${:.4}", cost)

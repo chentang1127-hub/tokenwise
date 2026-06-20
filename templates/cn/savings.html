@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TokenWise — 节省分析</title>
-<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
 <style>
   :root {
     --bg: #0f172a; --card-bg: #1e293b; --border: #334155;
@@ -16,7 +16,8 @@
   nav { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; gap: 24px; align-items: center; height: 56px; }
   nav a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; transition: all 0.15s; }
   nav a:hover, nav a.active { color: var(--text); background: rgba(255,255,255,0.05); }
-  nav .brand { font-weight: 700; font-size: 18px; color: var(--green); margin-right: auto; }
+  nav .brand { font-weight: 700; font-size: 18px; color: var(--green); }
+  nav .lang-toggle { margin-left: auto; border: 1px solid var(--border); padding: 4px 10px; font-size: 12px; }
   main { max-width: 700px; margin: 0 auto; padding: 32px 24px; }
   .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; }
   .card h3 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
@@ -36,6 +37,7 @@
   <a href="/">仪表板</a>
   <a href="/calls">调用记录</a>
   <a href="/savings" class="active">节省分析</a>
+  <a href="{{ lang_toggle_url }}" class="lang-toggle">{{ lang_toggle_label }}</a>
 </nav>
 <main>
   <div class="card">
