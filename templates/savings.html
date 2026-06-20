@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TokenWise — Savings</title>
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<style>
+  :root {
+    --bg: #0f172a; --card-bg: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --green: #22c55e; --blue: #3b82f6;
+    --purple: #a855f7; --red: #ef4444; --yellow: #eab308;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  nav { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; gap: 24px; align-items: center; height: 56px; }
+  nav a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; transition: all 0.15s; }
+  nav a:hover, nav a.active { color: var(--text); background: rgba(255,255,255,0.05); }
+  nav .brand { font-weight: 700; font-size: 18px; color: var(--green); margin-right: auto; }
+  main { max-width: 700px; margin: 0 auto; padding: 32px 24px; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+  .card h3 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .card .big { font-size: 36px; font-weight: 700; }
+  .card .big.green { color: var(--green); }
+  .card .sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .how-it-works { margin-top: 32px; }
+  .how-it-works h2 { font-size: 18px; margin-bottom: 12px; }
+  .how-it-works p { color: var(--muted); line-height: 1.7; font-size: 14px; }
+  .how-it-works code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  .footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body hx-boost="true">
+<nav>
+  <span class="brand">⚡ TokenWise</span>
+  <a href="/">Dashboard</a>
+  <a href="/calls">Calls</a>
+  <a href="/savings" class="active">Savings</a>
+</nav>
+<main>
+  <div class="card">
+    <h3>This Month's API Cost</h3>
+    <div class="big">{{ month_cost }}</div>
+  </div>
+  <div class="card">
+    <h3>Estimated Savings</h3>
+    <div class="big green">{{ estimated_savings }}</div>
+    <div class="sub">That's {{ savings_pct }} of what you would've paid using only GPT-4.1</div>
+  </div>
+
+  <div class="how-it-works">
+    <h2>How TokenWise Saves You Money</h2>
+    <p>
+      TokenWise analyzes every prompt your app sends. Simple tasks (summarization, translation,
+      classification) are routed to the cheapest capable model. Complex tasks (reasoning, code
+      generation, debugging) go to premium models.
+    </p>
+    <p style="margin-top:12px">
+      The savings estimate compares your actual cost against what you would have paid if every
+      single request went to the most expensive model in your configuration — usually
+      <code>gpt-4.1</code> or <code>claude-sonnet-4-6</code>.
+    </p>
+    <p style="margin-top:12px">
+      Most users save <strong>70–90%</strong> on their API bills, because 60–80% of all LLM
+      calls are simple tasks that don't need frontier models.
+    </p>
+  </div>
+</main>
+<div class="footer">TokenWise v0.1.0 · All data stored locally · Nothing leaves your machine</div>
+</body>
+</html>

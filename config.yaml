@@ -1,0 +1,103 @@
+# TokenWise configuration
+# Default config — edit to match your setup.
+
+proxy:
+  listen: "127.0.0.1:9401"     # The proxy port your app connects to
+  admin: "127.0.0.1:9400"       # Dashboard + API port
+  timeout_secs: 120             # Upstream request timeout
+
+# Your API provider configurations
+providers:
+  - name: "openai"
+    base_url: "https://api.openai.com/v1"
+    api_key_env: "OPENAI_API_KEY"
+    models:
+      - id: "gpt-4o-mini"
+        tier: "mid"
+        cost_per_1k_prompt:    0.00015
+        cost_per_1k_completion: 0.0006
+      - id: "gpt-4.1"
+        tier: "premium"
+        cost_per_1k_prompt:    0.002
+        cost_per_1k_completion: 0.008
+
+  - name: "deepseek"
+    base_url: "https://api.deepseek.com/v1"
+    api_key_env: "DEEPSEEK_API_KEY"
+    models:
+      - id: "deepseek-chat"
+        tier: "cheap"
+        cost_per_1k_prompt:    0.00027
+        cost_per_1k_completion: 0.0011
+      - id: "deepseek-reasoner"
+        tier: "premium"
+        cost_per_1k_prompt:    0.00055
+        cost_per_1k_completion: 0.00219
+
+  - name: "anthropic"
+    base_url: "https://api.anthropic.com/v1"
+    api_key_env: "ANTHROPIC_API_KEY"
+    models:
+      - id: "claude-sonnet-4-6"
+        tier: "premium"
+        cost_per_1k_prompt:    0.003
+        cost_per_1k_completion: 0.015
+      - id: "claude-haiku-4-5"
+        tier: "mid"
+        cost_per_1k_prompt:    0.0008
+        cost_per_1k_completion: 0.004
+
+# Routing rules
+routing:
+  # Complexity thresholds for prompt token counts
+  simple_max_tokens: 300
+  complex_min_tokens: 1500
+
+  # Simple-task keywords (case-insensitive)
+  simple_keywords:
+    - "summarize"
+    - "translate"
+    - "extract"
+    - "classify"
+    - "what is"
+    - "define"
+    - "list"
+    - "convert"
+
+  # Complex-task patterns (case-insensitive)
+  complex_keywords:
+    - "step by step"
+    - "think carefully"
+    - "reason about"
+    - "debug"
+    - "implement"
+    - "write code"
+    - "refactor"
+    - "design"
+
+  # Model tier selection
+  tier_simple: "cheap"
+  tier_complex: "premium"
+  tier_default: "mid"
+
+# Quality safety net
+safety_net:
+  enabled: true
+  max_fallback_retries: 1
+  # Fallback chain: if tier X fails, try tier Y
+  fallback_map:
+    cheap: "mid"
+    mid: "premium"
+  # Triggers for fallback
+  fallback_on_empty_response: true
+  fallback_on_truncated: true
+
+# License
+license:
+  key: ""
+  # Leave empty for Free tier. Pro key unlocks smart routing + safety net.
+
+# Storage
+storage:
+  db_path: "./tokenwise.db"
+  retention_days: 90

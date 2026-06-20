@@ -1,0 +1,56 @@
+[package]
+name = "tokenwise"
+version = "0.1.0"
+edition = "2024"
+description = "A Rust transparent proxy that saves 70-90% on AI API costs"
+license = "MIT"
+repository = "https://github.com/tokenwise/tokenwise"
+
+[[bin]]
+name = "tokenwise"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Proxy core
+hyper = { version = "1", features = ["server", "http1", "http2", "client"] }
+http-body = "1"
+http-body-util = "0.1"
+hyper-util = { version = "0.1", features = ["full"] }
+axum = "0.8"
+tower = "0.5"
+
+# HTTP client for upstream calls
+reqwest = { version = "0.12", features = ["stream", "json", "rustls-tls"], default-features = false }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# SQLite (bundled)
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Templates
+askama = "0.13"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utilities
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+bytes = "1"
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+base64 = "0.22"
+once_cell = "1"
+parking_lot = "0.12"
+futures-util = "0.3"

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TokenWise — 节省分析</title>
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<style>
+  :root {
+    --bg: #0f172a; --card-bg: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --green: #22c55e; --blue: #3b82f6;
+    --purple: #a855f7; --red: #ef4444; --yellow: #eab308;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  nav { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; gap: 24px; align-items: center; height: 56px; }
+  nav a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; transition: all 0.15s; }
+  nav a:hover, nav a.active { color: var(--text); background: rgba(255,255,255,0.05); }
+  nav .brand { font-weight: 700; font-size: 18px; color: var(--green); margin-right: auto; }
+  main { max-width: 700px; margin: 0 auto; padding: 32px 24px; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+  .card h3 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .card .big { font-size: 36px; font-weight: 700; }
+  .card .big.green { color: var(--green); }
+  .card .sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .how-it-works { margin-top: 32px; }
+  .how-it-works h2 { font-size: 18px; margin-bottom: 12px; }
+  .how-it-works p { color: var(--muted); line-height: 1.7; font-size: 14px; }
+  .how-it-works code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  .footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body hx-boost="true">
+<nav>
+  <span class="brand">⚡ TokenWise</span>
+  <a href="/">仪表板</a>
+  <a href="/calls">调用记录</a>
+  <a href="/savings" class="active">节省分析</a>
+</nav>
+<main>
+  <div class="card">
+    <h3>本月 API 费用</h3>
+    <div class="big">{{ month_cost }}</div>
+  </div>
+  <div class="card">
+    <h3>预估节省金额</h3>
+    <div class="big green">{{ estimated_savings }}</div>
+    <div class="sub">相当于只用 GPT-4.1 时的 {{ savings_pct }} 费用</div>
+  </div>
+
+  <div class="how-it-works">
+    <h2>TokenWise 如何帮你省钱</h2>
+    <p>
+      TokenWise 分析你应用中发出的每一条提示词。简单任务（翻译、总结、
+      分类）路由到最便宜的模型；复杂任务（推理、代码生成、
+      调试）路由到高级模型。
+    </p>
+    <p style="margin-top:12px">
+      节省估算 = 对比你当前的混合路由成本 vs 所有调用都走最贵模型的成本。
+      通常最贵的模型是 <code>deepseek-reasoner</code> 或 <code>glm-4-plus</code>。
+    </p>
+    <p style="margin-top:12px">
+      大多数用户能节省 <strong>70–90%</strong> 的 API 费用，因为 60–80% 的 LLM 调用
+      其实都是简单任务，根本不需要昂贵的前沿模型。
+    </p>
+    <p style="margin-top:12px">
+      当前支持 8 家中国 AI 厂商：DeepSeek、智谱 GLM、通义千问、月之暗面 Kimi、
+      字节豆包、百度文心、MiniMax、零一万物 —— 一键切换，零代码修改。
+    </p>
+  </div>
+</main>
+<div class="footer">TokenWise v0.1.0 · 数据仅存储在本地 · 不外传任何信息</div>
+</body>
+</html>
