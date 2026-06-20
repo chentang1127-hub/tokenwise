@@ -101,7 +101,10 @@ fn is_cn(state: &Arc<AppState>) -> bool {
 
 /// Resolve effective locale from query param → config → default.
 /// Returns (is_chinese, toggle_label, toggle_url).
-fn resolve_lang(params: &HashMap<String, String>, state: &Arc<AppState>) -> (bool, &'static str, &'static str) {
+fn resolve_lang(
+    params: &HashMap<String, String>,
+    state: &Arc<AppState>,
+) -> (bool, &'static str, &'static str) {
     let use_cn = match params.get("lang") {
         Some(l) if l == "zh" || l == "cn" => true,
         Some(l) if l == "en" => false,
