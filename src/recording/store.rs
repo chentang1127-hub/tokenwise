@@ -124,7 +124,10 @@ impl Store {
     }
 
     /// Get recent calls.
-    pub fn recent_calls(&self, limit: usize) -> Result<Vec<CallRecord>, Box<dyn std::error::Error>> {
+    pub fn recent_calls(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<CallRecord>, Box<dyn std::error::Error>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason
@@ -154,9 +157,7 @@ impl Store {
     /// Get aggregate stats for the current month.
     pub fn monthly_stats(&self) -> Result<MonthlyStats, Box<dyn std::error::Error>> {
         let conn = self.conn.lock().unwrap();
-        let month_start = chrono::Utc::now()
-            .format("%Y-%m-01")
-            .to_string();
+        let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
 
         let stats = conn.query_row(
             "SELECT COUNT(*), COALESCE(SUM(prompt_tokens), 0), COALESCE(SUM(completion_tokens), 0), COALESCE(SUM(cost_usd), 0.0), COALESCE(AVG(latency_ms), 0)
@@ -200,7 +201,9 @@ mod tests {
         let store = Store::new(":memory:").expect("Failed to open in-memory store");
         let rec = test_rec();
         let request = serde_json::json!({"messages": [{"role": "user", "content": "Hello"}]});
-        store.record_call(&rec, &request).expect("record_call failed");
+        store
+            .record_call(&rec, &request)
+            .expect("record_call failed");
         let recent = store.recent_calls(10).unwrap();
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0].model, "test-model");

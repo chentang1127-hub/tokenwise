@@ -3,13 +3,8 @@
 
 use std::sync::Arc;
 
-use axum::{
-    Router,
-    extract::State,
-    response::Html,
-    routing::get,
-};
 use askama::Template;
+use axum::{Router, extract::State, response::Html, routing::get};
 
 use super::AppState;
 
@@ -99,7 +94,10 @@ async fn dashboard(State(state): State<Arc<AppState>>) -> Html<String> {
     // Estimate savings: assume ~5x savings vs all-premium routing
     let estimated_savings = stats.total_cost * 5.0;
     let savings_pct = if stats.total_cost > 0.0 {
-        format!("{:.0}%", (estimated_savings / (stats.total_cost + estimated_savings)) * 100.0)
+        format!(
+            "{:.0}%",
+            (estimated_savings / (stats.total_cost + estimated_savings)) * 100.0
+        )
     } else {
         "N/A".to_string()
     };
@@ -127,7 +125,11 @@ async fn dashboard(State(state): State<Arc<AppState>>) -> Html<String> {
             avg_latency,
             recent_calls,
         };
-        Html(template.render().unwrap_or_else(|e| format!("Template error: {e}")))
+        Html(
+            template
+                .render()
+                .unwrap_or_else(|e| format!("Template error: {e}")),
+        )
     } else {
         let template = DashboardTemplate {
             total_calls,
@@ -137,7 +139,11 @@ async fn dashboard(State(state): State<Arc<AppState>>) -> Html<String> {
             avg_latency,
             recent_calls,
         };
-        Html(template.render().unwrap_or_else(|e| format!("Template error: {e}")))
+        Html(
+            template
+                .render()
+                .unwrap_or_else(|e| format!("Template error: {e}")),
+        )
     }
 }
 
@@ -155,10 +161,18 @@ async fn calls_page(State(state): State<Arc<AppState>>) -> Html<String> {
 
     if is_cn(&state) {
         let template = CallsTemplateCn { calls: call_rows };
-        Html(template.render().unwrap_or_else(|e| format!("Template error: {e}")))
+        Html(
+            template
+                .render()
+                .unwrap_or_else(|e| format!("Template error: {e}")),
+        )
     } else {
         let template = CallsTemplate { calls: call_rows };
-        Html(template.render().unwrap_or_else(|e| format!("Template error: {e}")))
+        Html(
+            template
+                .render()
+                .unwrap_or_else(|e| format!("Template error: {e}")),
+        )
     }
 }
 
@@ -166,7 +180,10 @@ async fn savings_page(State(state): State<Arc<AppState>>) -> Html<String> {
     let stats = state.store.monthly_stats().unwrap_or_default();
     let estimated_savings = stats.total_cost * 5.0;
     let savings_pct = if stats.total_cost > 0.0 {
-        format!("{:.0}%", (estimated_savings / (stats.total_cost + estimated_savings)) * 100.0)
+        format!(
+            "{:.0}%",
+            (estimated_savings / (stats.total_cost + estimated_savings)) * 100.0
+        )
     } else {
         "N/A".to_string()
     };
@@ -180,14 +197,22 @@ async fn savings_page(State(state): State<Arc<AppState>>) -> Html<String> {
             estimated_savings: estimated_savings_fmt,
             savings_pct,
         };
-        Html(template.render().unwrap_or_else(|e| format!("Template error: {e}")))
+        Html(
+            template
+                .render()
+                .unwrap_or_else(|e| format!("Template error: {e}")),
+        )
     } else {
         let template = SavingsTemplate {
             month_cost,
             estimated_savings: estimated_savings_fmt,
             savings_pct,
         };
-        Html(template.render().unwrap_or_else(|e| format!("Template error: {e}")))
+        Html(
+            template
+                .render()
+                .unwrap_or_else(|e| format!("Template error: {e}")),
+        )
     }
 }
 

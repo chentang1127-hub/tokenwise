@@ -111,12 +111,19 @@ mod tests {
             simple_max_tokens: 300,
             complex_min_tokens: 1500,
             simple_keywords: vec![
-                "summarize".into(), "translate".into(), "extract".into(),
-                "classify".into(), "what is".into(), "define".into(),
+                "summarize".into(),
+                "translate".into(),
+                "extract".into(),
+                "classify".into(),
+                "what is".into(),
+                "define".into(),
             ],
             complex_keywords: vec![
-                "step by step".into(), "debug".into(), "implement".into(),
-                "write code".into(), "refactor".into(),
+                "step by step".into(),
+                "debug".into(),
+                "implement".into(),
+                "write code".into(),
+                "refactor".into(),
             ],
             tier_simple: "cheap".into(),
             tier_complex: "premium".into(),
@@ -138,14 +145,18 @@ mod tests {
     #[test]
     fn test_complex_classification() {
         let cfg = test_config();
-        let msgs = vec![msg("Please debug this Rust code step by step and explain the memory issue")];
+        let msgs = vec![msg(
+            "Please debug this Rust code step by step and explain the memory issue",
+        )];
         assert_eq!(classify(&msgs, None, &cfg), Complexity::Complex);
     }
 
     #[test]
     fn test_medium_default() {
         let cfg = test_config();
-        let msgs = vec![msg("Tell me about the history of machine learning and its applications in modern software engineering")];
+        let msgs = vec![msg(
+            "Tell me about the history of machine learning and its applications in modern software engineering",
+        )];
         assert_eq!(classify(&msgs, None, &cfg), Complexity::Medium);
     }
 

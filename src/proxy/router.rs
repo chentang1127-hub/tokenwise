@@ -25,24 +25,18 @@ pub fn route(complexity: Complexity, config: &Config) -> Route {
         Complexity::Complex => &config.routing.tier_complex,
     };
 
-    let (provider, model) = config
-        .cheapest_model_in_tier(tier_name)
-        .unwrap_or_else(|| {
-            // Fallback: use first available provider
-            let p = config.providers.first().expect("No providers configured");
-            let m = p.models.first().expect("No models configured for provider");
-            (p, m)
-        });
+    let (provider, model) = config.cheapest_model_in_tier(tier_name).unwrap_or_else(|| {
+        // Fallback: use first available provider
+        let p = config.providers.first().expect("No providers configured");
+        let m = p.models.first().expect("No models configured for provider");
+        (p, m)
+    });
 
     let api_key = std::env::var(&provider.api_key_env).unwrap_or_default();
 
     info!(
         "📌 Routed [{}] → {}/{} (${:.6}/1K prompt, ${:.6}/1K completion)",
-        tier_name,
-        provider.name,
-        model.id,
-        model.cost_per_1k_prompt,
-        model.cost_per_1k_completion,
+        tier_name, provider.name, model.id, model.cost_per_1k_prompt, model.cost_per_1k_completion,
     );
 
     Route {
@@ -94,27 +88,23 @@ mod tests {
                     name: "budget".into(),
                     base_url: "https://budget.api/v1".into(),
                     api_key_env: "BUDGET_KEY".into(),
-                    models: vec![
-                        ModelConfig {
-                            id: "budget-model".into(),
-                            tier: "cheap".into(),
-                            cost_per_1k_prompt: 0.0001,
-                            cost_per_1k_completion: 0.0005,
-                        },
-                    ],
+                    models: vec![ModelConfig {
+                        id: "budget-model".into(),
+                        tier: "cheap".into(),
+                        cost_per_1k_prompt: 0.0001,
+                        cost_per_1k_completion: 0.0005,
+                    }],
                 },
                 ProviderConfig {
                     name: "premium".into(),
                     base_url: "https://premium.api/v1".into(),
                     api_key_env: "PREMIUM_KEY".into(),
-                    models: vec![
-                        ModelConfig {
-                            id: "premium-model".into(),
-                            tier: "premium".into(),
-                            cost_per_1k_prompt: 0.003,
-                            cost_per_1k_completion: 0.015,
-                        },
-                    ],
+                    models: vec![ModelConfig {
+                        id: "premium-model".into(),
+                        tier: "premium".into(),
+                        cost_per_1k_prompt: 0.003,
+                        cost_per_1k_completion: 0.015,
+                    }],
                 },
             ],
             routing: RoutingConfig {

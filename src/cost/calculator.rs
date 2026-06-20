@@ -3,11 +3,7 @@
 use crate::config::{ModelConfig, ProviderConfig};
 
 /// Compute the cost of a single API call.
-pub fn compute_cost(
-    prompt_tokens: u32,
-    completion_tokens: u32,
-    model: &ModelConfig,
-) -> f64 {
+pub fn compute_cost(prompt_tokens: u32, completion_tokens: u32, model: &ModelConfig) -> f64 {
     let prompt_cost = (prompt_tokens as f64 / 1000.0) * model.cost_per_1k_prompt;
     let completion_cost = (completion_tokens as f64 / 1000.0) * model.cost_per_1k_completion;
     prompt_cost + completion_cost
@@ -21,13 +17,11 @@ pub fn estimate_savings(
     all_models: &[(&ProviderConfig, &ModelConfig)],
 ) -> f64 {
     // Find the most expensive model across all providers
-    let most_expensive = all_models
-        .iter()
-        .max_by(|a, b| {
-            let cost_a = a.1.cost_per_1k_prompt + a.1.cost_per_1k_completion;
-            let cost_b = b.1.cost_per_1k_prompt + b.1.cost_per_1k_completion;
-            cost_a.partial_cmp(&cost_b).unwrap()
-        });
+    let most_expensive = all_models.iter().max_by(|a, b| {
+        let cost_a = a.1.cost_per_1k_prompt + a.1.cost_per_1k_completion;
+        let cost_b = b.1.cost_per_1k_prompt + b.1.cost_per_1k_completion;
+        cost_a.partial_cmp(&cost_b).unwrap()
+    });
 
     if let Some((_, expensive_model)) = most_expensive {
         let premium_cost = compute_cost(prompt_tokens, completion_tokens, expensive_model);
@@ -92,20 +86,31 @@ mod tests {
             cost_per_1k_prompt: 0.003,
             cost_per_1k_completion: 0.015,
         };
-        let savings = estimate_savings(1000, 1000, &cheap, &[
-            (&ProviderConfig {
-                name: "test".into(),
-                base_url: "".into(),
-                api_key_env: "".into(),
-                models: vec![cheap.clone()],
-            }, &cheap),
-            (&ProviderConfig {
-                name: "expensive".into(),
-                base_url: "".into(),
-                api_key_env: "".into(),
-                models: vec![expensive.clone()],
-            }, &expensive),
-        ]);
+        let savings = estimate_savings(
+            1000,
+            1000,
+            &cheap,
+            &[
+                (
+                    &ProviderConfig {
+                        name: "test".into(),
+                        base_url: "".into(),
+                        api_key_env: "".into(),
+                        models: vec![cheap.clone()],
+                    },
+                    &cheap,
+                ),
+                (
+                    &ProviderConfig {
+                        name: "expensive".into(),
+                        base_url: "".into(),
+                        api_key_env: "".into(),
+                        models: vec![expensive.clone()],
+                    },
+                    &expensive,
+                ),
+            ],
+        );
         assert!(savings > 0.0);
     }
 }

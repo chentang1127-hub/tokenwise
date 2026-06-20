@@ -13,8 +13,8 @@
 //!   - Safety net disabled
 //!   - Cache disabled (future)
 
-use sha2::Sha256;
 use hmac::{Hmac, Mac};
+use sha2::Sha256;
 use tracing::{info, warn};
 
 /// Embedded secret for license key signing.
@@ -107,16 +107,12 @@ pub fn verify_license(key: &str) -> LicenseTier {
 
     if expires_at < now {
         let days_ago = (now - expires_at) / 86400;
-        warn!(
-            "License key expired {days_ago} days ago. Falling back to Free tier."
-        );
+        warn!("License key expired {days_ago} days ago. Falling back to Free tier.");
         return LicenseTier::Free;
     }
 
     let days_left = (expires_at - now) / 86400;
-    info!(
-        "✅ Pro license active — {days_left} days remaining. All features enabled."
-    );
+    info!("✅ Pro license active — {days_left} days remaining. All features enabled.");
 
     LicenseTier::Pro { expires_at }
 }
@@ -142,8 +138,7 @@ mod tests {
     /// Generate a valid test key for the given expiry timestamp.
     fn generate_test_key(expires_at: u64) -> String {
         let expiry_bytes = expires_at.to_be_bytes();
-        let mut mac =
-            Hmac::<Sha256>::new_from_slice(LICENSE_SECRET).unwrap();
+        let mut mac = Hmac::<Sha256>::new_from_slice(LICENSE_SECRET).unwrap();
         mac.update(&expiry_bytes);
         let signature = mac.finalize().into_bytes();
 

@@ -106,10 +106,14 @@ pub fn spawn_analyzer() -> (mpsc::UnboundedSender<Bytes>, JoinHandle<StreamMetri
 
                     // Extract usage (usually in last chunk)
                     if let Some(usage) = json.get("usage") {
-                        local.prompt_tokens =
-                            usage.get("prompt_tokens").and_then(|v| v.as_u64()).map(|v| v as u32);
-                        local.completion_tokens =
-                            usage.get("completion_tokens").and_then(|v| v.as_u64()).map(|v| v as u32);
+                        local.prompt_tokens = usage
+                            .get("prompt_tokens")
+                            .and_then(|v| v.as_u64())
+                            .map(|v| v as u32);
+                        local.completion_tokens = usage
+                            .get("completion_tokens")
+                            .and_then(|v| v.as_u64())
+                            .map(|v| v as u32);
                     }
 
                     // Extract finish reason

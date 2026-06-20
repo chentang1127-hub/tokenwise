@@ -9,9 +9,9 @@ use std::convert::Infallible;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use http_body_util::combinators::BoxBody;
 use hyper::body::Incoming;
 use hyper::service::Service;
-use http_body_util::combinators::BoxBody;
 
 use crate::config::Config;
 use crate::recording::Store;
@@ -27,8 +27,8 @@ pub fn build_service(
     Future = std::pin::Pin<
         Box<
             dyn std::future::Future<
-                Output = Result<hyper::Response<BoxBody<Bytes, String>>, Infallible>,
-            > + Send,
+                    Output = Result<hyper::Response<BoxBody<Bytes, String>>, Infallible>,
+                > + Send,
         >,
     >,
 > + Clone {

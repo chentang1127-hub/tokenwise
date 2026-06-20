@@ -9,11 +9,11 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bytes::Bytes;
+use futures_util::StreamExt;
+use http_body_util::{BodyExt, Full, StreamBody, combinators::BoxBody};
 use hyper::body::Incoming;
 use hyper::service::Service;
 use hyper::{Request, Response, StatusCode};
-use http_body_util::{combinators::BoxBody, BodyExt, Full, StreamBody};
-use futures_util::StreamExt;
 use tracing::{debug, error, info, warn};
 
 use crate::config::Config;
@@ -52,7 +52,10 @@ impl ProxyService {
     }
 
     /// Core request handling.
-    async fn handle(&self, req: Request<Incoming>) -> Result<Response<BoxBody<Bytes, String>>, Infallible> {
+    async fn handle(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<BoxBody<Bytes, String>>, Infallible> {
         let start = Instant::now();
 
         // Only handle /v1/chat/completions
@@ -68,7 +71,10 @@ impl ProxyService {
         let body_bytes = match body.collect().await {
             Ok(collected) => collected.to_bytes(),
             Err(e) => {
-                return Ok(Self::error_response(StatusCode::BAD_REQUEST, &format!("Failed to read body: {e}")));
+                return Ok(Self::error_response(
+                    StatusCode::BAD_REQUEST,
+                    &format!("Failed to read body: {e}"),
+                ));
             }
         };
 
@@ -77,7 +83,10 @@ impl ProxyService {
             Ok(v) => v,
             Err(e) => {
                 warn!("Invalid JSON in request: {e}");
-                return Ok(Self::error_response(StatusCode::BAD_REQUEST, &format!("Invalid JSON: {e}")));
+                return Ok(Self::error_response(
+                    StatusCode::BAD_REQUEST,
+                    &format!("Invalid JSON: {e}"),
+                ));
             }
         };
 
@@ -97,12 +106,12 @@ impl ProxyService {
         // Rewrite model in request body to the routed model
         let mut upstream_json = request_json.clone();
         upstream_json["model"] = serde_json::Value::String(primary_route.model.clone());
-        let upstream_body = serde_json::to_vec(&upstream_json).unwrap_or_else(|_| body_bytes.to_vec());
+        let upstream_body =
+            serde_json::to_vec(&upstream_json).unwrap_or_else(|_| body_bytes.to_vec());
 
         // Make upstream request (with optional fallback)
-        let (response, actual_route, fallback_used) = self
-            .try_upstream(&upstream_body, &primary_route)
-            .await;
+        let (response, actual_route, fallback_used) =
+            self.try_upstream(&upstream_body, &primary_route).await;
 
         let latency_ms = start.elapsed().as_millis() as u64;
 
@@ -110,7 +119,10 @@ impl ProxyService {
             Ok(r) => r,
             Err(e) => {
                 error!("All upstream attempts failed: {e}");
-                return Ok(Self::error_response(StatusCode::BAD_GATEWAY, &format!("Upstream failed: {e}")));
+                return Ok(Self::error_response(
+                    StatusCode::BAD_GATEWAY,
+                    &format!("Upstream failed: {e}"),
+                ));
             }
         };
 
@@ -132,11 +144,16 @@ impl ProxyService {
             let body_stream = tee.map(|result| {
                 result
                     .map(|bytes| http_body::Frame::data(bytes))
-                    .map_err(|s| Box::new(std::io::Error::new(std::io::ErrorKind::Other, s))
-                        as Box<dyn std::error::Error + Send + Sync>)
+                    .map_err(|s| {
+                        Box::new(std::io::Error::new(std::io::ErrorKind::Other, s))
+                            as Box<dyn std::error::Error + Send + Sync>
+                    })
             });
             let stream_body = StreamBody::new(body_stream);
-            let boxed = BoxBody::new(BodyExt::boxed(stream_body).map_err(|e: Box<dyn std::error::Error + Send + Sync>| e.to_string()));
+            let boxed = BoxBody::new(
+                BodyExt::boxed(stream_body)
+                    .map_err(|e: Box<dyn std::error::Error + Send + Sync>| e.to_string()),
+            );
 
             // Spawn recording task — awaits analyzer completion so token counts are real
             let store = self.store.clone();
@@ -164,7 +181,8 @@ impl ProxyService {
 
                 // Compute actual cost from model pricing
                 if let Some(model_cfg) = cfg.model_config(&provider, &model) {
-                    rec.cost_usd = crate::cost::calculator::compute_cost(prompt, completion, model_cfg);
+                    rec.cost_usd =
+                        crate::cost::calculator::compute_cost(prompt, completion, model_cfg);
                 }
 
                 if let Some(ref reason) = metrics.finish_reason {
@@ -201,15 +219,28 @@ impl ProxyService {
 
             if let Ok(response_json) = serde_json::from_slice::<serde_json::Value>(&resp_bytes) {
                 if let Some(usage) = response_json.get("usage") {
-                    let prompt = usage.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-                    let completion = usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                    let prompt = usage
+                        .get("prompt_tokens")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as u32;
+                    let completion = usage
+                        .get("completion_tokens")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as u32;
                     rec = rec.with_usage(prompt, completion);
 
                     // Compute actual cost from model pricing
-                    if let Some(model_cfg) = self.cfg.model_config(&actual_route.provider, &actual_route.model) {
-                        rec.cost_usd = crate::cost::calculator::compute_cost(prompt, completion, model_cfg);
+                    if let Some(model_cfg) = self
+                        .cfg
+                        .model_config(&actual_route.provider, &actual_route.model)
+                    {
+                        rec.cost_usd =
+                            crate::cost::calculator::compute_cost(prompt, completion, model_cfg);
                     }
-                    debug!("Usage: prompt={prompt}, completion={completion}, cost=${:.6}", rec.cost_usd);
+                    debug!(
+                        "Usage: prompt={prompt}, completion={completion}, cost=${:.6}",
+                        rec.cost_usd
+                    );
                 }
             }
 
@@ -253,7 +284,10 @@ impl ProxyService {
                 let status_code = resp.status();
 
                 if self.cfg.safety_net.enabled {
-                    warn!("Upstream {} returned {status_code}, attempting fallback...", route.model);
+                    warn!(
+                        "Upstream {} returned {status_code}, attempting fallback...",
+                        route.model
+                    );
 
                     // Drain body to allow connection reuse
                     let _ = resp.bytes().await;
@@ -282,10 +316,17 @@ impl ProxyService {
                     let _ = resp.bytes().await;
                 }
 
-                (Err(format!("Upstream returned {status_code}")), route.clone(), false)
+                (
+                    Err(format!("Upstream returned {status_code}")),
+                    route.clone(),
+                    false,
+                )
             }
             Err(e) => {
-                warn!("Upstream {} error: {e}. Attempting fallback...", route.model);
+                warn!(
+                    "Upstream {} error: {e}. Attempting fallback...",
+                    route.model
+                );
 
                 if self.cfg.safety_net.enabled {
                     if let Some(fb_route) = fallback_route(&route.tier, &self.cfg) {
@@ -299,7 +340,10 @@ impl ProxyService {
 
                         match fb_req.send().await {
                             Ok(fb_resp) => {
-                                info!("Fallback to {} succeeded after connection error", fb_route.model);
+                                info!(
+                                    "Fallback to {} succeeded after connection error",
+                                    fb_route.model
+                                );
                                 return (Ok(fb_resp), fb_route, true);
                             }
                             Err(fb_e) => {
@@ -322,9 +366,7 @@ impl ProxyService {
 impl Service<Request<Incoming>> for ProxyService {
     type Response = Response<BoxBody<Bytes, String>>;
     type Error = Infallible;
-    type Future = Pin<
-        Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>,
-    >;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn call(&self, req: Request<Incoming>) -> Self::Future {
         let this = self.clone();

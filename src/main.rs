@@ -5,19 +5,19 @@
 //!                       │
 //!                       └── Admin Dashboard (:9400)
 
-mod config;
-mod proxy;
-mod recording;
 mod admin;
+mod config;
 mod cost;
 mod license;
+mod proxy;
+mod recording;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use tokio::net::TcpListener;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 use config::Config;
@@ -163,10 +163,7 @@ async fn main() {
                 let svc = proxy_service.clone();
                 tokio::spawn(async move {
                     if let Err(e) = hyper::server::conn::http1::Builder::new()
-                        .serve_connection(
-                            hyper_util::rt::TokioIo::new(stream),
-                            svc,
-                        )
+                        .serve_connection(hyper_util::rt::TokioIo::new(stream), svc)
                         .await
                     {
                         if !e.to_string().contains("connection reset") {
