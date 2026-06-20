@@ -26,10 +26,13 @@ impl Complexity {
 /// Classify a prompt based on heuristic rules.
 ///
 /// Rules (in priority order):
-/// 1. Token count thresholds (if available)
-/// 2. Complex keywords/phrases → Complex
-/// 3. Simple keywords → Simple
-/// 4. Default → Medium
+/// 1. Token count thresholds (if available, or estimated from char count)
+/// 2. Code patterns in prompt → Complex
+/// 3. Complex keywords/phrases → Complex
+/// 4. Question detection (short + "?" + what/why/how) → Simple
+/// 5. Simple keywords → Simple
+/// 6. Length heuristics
+/// 7. Default → Medium
 pub fn classify(
     messages: &[serde_json::Value],
     token_count: Option<usize>,
@@ -38,8 +41,35 @@ pub fn classify(
     // Extract all text from messages
     let text = extract_text(messages);
     let text_lower = text.to_lowercase();
+    let char_count = text.chars().count();
 
-    // Token-count thresholds (if token count available)
+    // ── Priority 1: Strong signals (code, multi-step) ───
+    if has_code_patterns(&text_lower) {
+        return Complexity::Complex;
+    }
+    if has_multi_step(&text_lower) {
+        return Complexity::Complex;
+    }
+
+    // ── Priority 2: Keyword detection ──────────────────
+    for kw in &config.complex_keywords {
+        if text_lower.contains(&kw.to_lowercase()) {
+            return Complexity::Complex;
+        }
+    }
+    for kw in &config.simple_keywords {
+        if text_lower.contains(&kw.to_lowercase()) {
+            return Complexity::Simple;
+        }
+    }
+
+    // ── Priority 3: Question heuristics ────────────────
+    if is_simple_question(&text, char_count) {
+        return Complexity::Simple;
+    }
+
+    // ── Priority 4: Token count thresholds ─────────────
+    // Only when actual token count is available (from upstream API estimate)
     if let Some(tokens) = token_count {
         if tokens < config.simple_max_tokens {
             return Complexity::Simple;
@@ -49,31 +79,82 @@ pub fn classify(
         }
     }
 
-    // Keyword-based detection: check complex patterns first
-    for kw in &config.complex_keywords {
-        if text_lower.contains(&kw.to_lowercase()) {
-            return Complexity::Complex;
-        }
-    }
-
-    // Check simple keywords
-    for kw in &config.simple_keywords {
-        if text_lower.contains(&kw.to_lowercase()) {
-            return Complexity::Simple;
-        }
-    }
-
-    // Heuristic: if text is very short (< 80 chars), probably simple
-    if text.chars().count() < 80 {
+    // ── Priority 5: Length heuristics ──────────────────
+    if char_count < 80 {
         return Complexity::Simple;
     }
-
-    // Heuristic: if text is long (> 2000 chars), probably complex
-    if text.chars().count() > 2000 {
+    if char_count > 2000 {
         return Complexity::Complex;
     }
 
     Complexity::Medium
+}
+
+/// Detect code-related patterns in the prompt.
+fn has_code_patterns(text: &str) -> bool {
+    let code_markers = [
+        "```", "fn ", "def ", "function ", "class ", "import ",
+        "pub fn", "let mut", "const ", "var ", "func ",
+        "package ", "#include", "console.log", "print(",
+        "struct ", "impl ", "trait ", "enum ",
+    ];
+    let mut matches = 0;
+    for marker in &code_markers {
+        if text.contains(marker) {
+            matches += 1;
+            if matches >= 2 {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Detect multi-step instructions.
+fn has_multi_step(text: &str) -> bool {
+    let step_markers = [
+        "step 1", "step 2", "first", "second", "third",
+        "firstly", "secondly", "finally", "then",
+        "1.", "2.", "3.", "1)", "2)", "3)",
+        "第一步", "第二步", "首先", "然后", "最后",
+        "你需要", "请按照", "请根据以下步骤",
+    ];
+    let mut matches = 0;
+    for marker in &step_markers {
+        if text.contains(marker) {
+            matches += 1;
+            if matches >= 2 {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Check if prompt is a simple factual question.
+fn is_simple_question(text: &str, char_count: usize) -> bool {
+    if char_count > 200 {
+        return false;
+    }
+    let text = text.trim();
+    // Must end with question mark or be very short
+    if !text.ends_with('?') && !text.ends_with('？') && char_count > 50 {
+        return false;
+    }
+    // Check for simple question patterns
+    let lowered = text.to_lowercase();
+    let question_starters = [
+        "what is", "what are", "who is", "where is", "when did",
+        "how many", "how much", "which", "define",
+        "什么是", "谁", "哪里", "什么时候", "怎么读",
+        "翻译", "capital of", "translate", "say hello",
+    ];
+    for starter in &question_starters {
+        if lowered.contains(starter) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Extract concatenated text from chat completion messages.
@@ -163,11 +244,42 @@ mod tests {
     #[test]
     fn test_token_count_thresholds() {
         let cfg = test_config();
-        // Short prompt but > simple_max_tokens
         let msgs = vec![msg("Hello")];
-        // Token count estimation says 1 token, which is < 300 → simple
         assert_eq!(classify(&msgs, Some(1), &cfg), Complexity::Simple);
-        // High token count
         assert_eq!(classify(&msgs, Some(2000), &cfg), Complexity::Complex);
+    }
+
+    #[test]
+    fn test_code_detection_is_complex() {
+        let cfg = test_config();
+        let msgs = vec![msg("Write a function in Rust: fn foo() { let x = 1; }")];
+        assert_eq!(classify(&msgs, None, &cfg), Complexity::Complex);
+    }
+
+    #[test]
+    fn test_multi_step_is_complex() {
+        let cfg = test_config();
+        let msgs = vec![msg("First, install Python. Second, create a virtual environment. Then install dependencies.")];
+        assert_eq!(classify(&msgs, None, &cfg), Complexity::Complex);
+    }
+
+    #[test]
+    fn test_simple_question_detection() {
+        let cfg = test_config();
+        assert_eq!(
+            classify(&vec![msg("Who is the president of France?")], None, &cfg),
+            Complexity::Simple
+        );
+        assert_eq!(
+            classify(&vec![msg("Where is Tokyo?")], None, &cfg),
+            Complexity::Simple
+        );
+    }
+
+    #[test]
+    fn test_chinese_question_detection() {
+        let cfg = test_config();
+        let msgs = vec![msg("翻译：Hello World")];
+        assert_eq!(classify(&msgs, None, &cfg), Complexity::Simple);
     }
 }
