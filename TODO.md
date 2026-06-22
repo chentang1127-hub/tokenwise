@@ -18,6 +18,7 @@
 
 ### 🟢 如果你要上线发布
 
+- [x] 部署到生产 VPS（getipgeo.com）✅ 2026-06-23
 - [ ] 更新 README 里的"48 tests"→"51 tests"
 - [ ] 清理 `tokenwise.db` 里的真实数据（如果要公开仓库）
 - [ ] 决定是否重命名（TokenWise Core vs 其他名字）
@@ -40,6 +41,7 @@
 
 | 日期 | 做了什么 |
 |------|---------|
+| 6/23 | 🚀 生产部署：getipgeo.com VPS 上线，systemd 服务，nginx 反代 |
 | 6/22 | P5 全部完成：Try It 流式响应、用量告警、数据导出、多 Key 管理、Settings 页面 |
 | 6/21 | P3+P4 完成：Docker 部署、systemd、env override、Backup/Status CLI |
 | 6/20 | P1+P2 完成：Webhook 接入 proxy、多租户过滤、gRPC、流式安全兜底 |
@@ -77,4 +79,44 @@ cargo run --release -- status                # 查看运行状态
 4. 改完 → cargo test 跑测试
 5. 测试通过 → git commit 存档
 6. 更新这个 TODO.md → 记录改了什么
+```
+
+---
+
+## 生产环境
+
+| 项目 | 详情 |
+|------|------|
+| VPS | 144.34.180.112 (AlmaLinux 9.7) |
+| Dashboard | http://tw.getipgeo.com |
+| Proxy | http://llm.getipgeo.com/v1 |
+| 运行方式 | systemd (`systemctl status tokenwise`) |
+| 配置文件 | `/opt/tokenwise/config.yaml` |
+| 数据库 | `/opt/tokenwise/tokenwise.db` |
+| 日志 | `journalctl -u tokenwise -f` |
+| License | Pro（364 天剩余，2027-06-22 到期） |
+
+### VPS 组件一览
+
+```
+:80   → nginx (Docker)     → getipgeo.com, api.getipgeo.com, tw/llm.getipgeo.com
+:443  → ssserver (systemd)  → Shadowsocks，不动
+:9400 → tokenwise (systemd) → Dashboard（仅 localhost，通过 nginx 反代）
+:9401 → tokenwise (systemd) → Proxy（仅 localhost，通过 nginx 反代）
+```
+
+### 更新 TokenWise
+
+```bash
+# 1. 本地改代码推 GitHub
+# 2. SSH 到 VPS
+ssh root@144.34.180.112
+
+# 3. 拉代码编译
+cd /opt/tokenwise/src && git pull
+cargo build --release -j 1
+
+# 4. 更新二进制并重启
+cp target/release/tokenwise /usr/local/bin/
+systemctl restart tokenwise
 ```
