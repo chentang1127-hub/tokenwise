@@ -1,9 +1,15 @@
-# TokenWise configuration
+# TokenWise Core configuration
 # Default config — edit to match your setup.
 
+# Locale: "en" for English, "zh" for Chinese
+locale: "en"
+
+# Run without opening a browser (set to true for Docker/headless servers)
+headless: false
+
 proxy:
-  listen: "127.0.0.1:9401"     # The proxy port your app connects to
-  admin: "127.0.0.1:9400"       # Dashboard + API port
+  listen: "0.0.0.0:9401"       # The proxy port your app connects to (0.0.0.0 = all interfaces)
+  admin: "0.0.0.0:9400"        # Dashboard + API port
   timeout_secs: 120             # Upstream request timeout
 
 # Your API provider configurations
@@ -12,27 +18,18 @@ providers:
     base_url: "https://api.openai.com/v1"
     api_key_env: "OPENAI_API_KEY"
     models:
-      - id: "gpt-4o-mini"
-        tier: "mid"
-        cost_per_1k_prompt:    0.00015
-        cost_per_1k_completion: 0.0006
       - id: "gpt-4.1"
         tier: "premium"
         cost_per_1k_prompt:    0.002
         cost_per_1k_completion: 0.008
-
-  - name: "deepseek"
-    base_url: "https://api.deepseek.com/v1"
-    api_key_env: "DEEPSEEK_API_KEY"
-    models:
-      - id: "deepseek-chat"
+      - id: "gpt-4.1-mini"
+        tier: "mid"
+        cost_per_1k_prompt:    0.0001
+        cost_per_1k_completion: 0.0004
+      - id: "gpt-4.1-nano"
         tier: "cheap"
-        cost_per_1k_prompt:    0.00027
-        cost_per_1k_completion: 0.0011
-      - id: "deepseek-reasoner"
-        tier: "premium"
-        cost_per_1k_prompt:    0.00055
-        cost_per_1k_completion: 0.00219
+        cost_per_1k_prompt:    0.00005
+        cost_per_1k_completion: 0.0002
 
   - name: "anthropic"
     base_url: "https://api.anthropic.com/v1"
@@ -46,6 +43,117 @@ providers:
         tier: "mid"
         cost_per_1k_prompt:    0.0008
         cost_per_1k_completion: 0.004
+      - id: "claude-opus-4-8"
+        tier: "premium"
+        cost_per_1k_prompt:    0.015
+        cost_per_1k_completion: 0.075
+
+  - name: "google"
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
+    api_key_env: "GEMINI_API_KEY"
+    models:
+      - id: "gemini-2.5-flash"
+        tier: "cheap"
+        cost_per_1k_prompt:    0.00015
+        cost_per_1k_completion: 0.0006
+      - id: "gemini-2.5-pro"
+        tier: "premium"
+        cost_per_1k_prompt:    0.00125
+        cost_per_1k_completion: 0.005
+
+  - name: "mistral"
+    base_url: "https://api.mistral.ai/v1"
+    api_key_env: "MISTRAL_API_KEY"
+    models:
+      - id: "mistral-large"
+        tier: "premium"
+        cost_per_1k_prompt:    0.002
+        cost_per_1k_completion: 0.006
+      - id: "mistral-small"
+        tier: "mid"
+        cost_per_1k_prompt:    0.0002
+        cost_per_1k_completion: 0.0006
+      - id: "codestral"
+        tier: "mid"
+        cost_per_1k_prompt:    0.0002
+        cost_per_1k_completion: 0.0006
+
+  - name: "xai"
+    base_url: "https://api.x.ai/v1"
+    api_key_env: "XAI_API_KEY"
+    models:
+      - id: "grok-4"
+        tier: "premium"
+        cost_per_1k_prompt:    0.002
+        cost_per_1k_completion: 0.008
+      - id: "grok-4-mini"
+        tier: "mid"
+        cost_per_1k_prompt:    0.00015
+        cost_per_1k_completion: 0.0006
+
+  - name: "groq"
+    base_url: "https://api.groq.com/openai/v1"
+    api_key_env: "GROQ_API_KEY"
+    models:
+      - id: "llama-4-maverick"
+        tier: "mid"
+        cost_per_1k_prompt:    0.0002
+        cost_per_1k_completion: 0.0006
+      - id: "llama-4-scout"
+        tier: "cheap"
+        cost_per_1k_prompt:    0.00005
+        cost_per_1k_completion: 0.0002
+
+  - name: "deepseek"
+    base_url: "https://api.deepseek.com/v1"
+    api_key_env: "DEEPSEEK_API_KEY"
+    models:
+      - id: "deepseek-chat"
+        tier: "cheap"
+        cost_per_1k_prompt:    0.00027
+        cost_per_1k_completion: 0.0011
+      - id: "deepseek-reasoner"
+        tier: "premium"
+        cost_per_1k_prompt:    0.00055
+        cost_per_1k_completion: 0.00219
+      # Claude Code model aliases (DeepSeek API accepts these natively)
+      - id: "deepseek-v4-pro"
+        tier: "premium"
+        cost_per_1k_prompt:    0.00055
+        cost_per_1k_completion: 0.00219
+      - id: "deepseek-v4-flash"
+        tier: "cheap"
+        cost_per_1k_prompt:    0.00015
+        cost_per_1k_completion: 0.0006
+
+  - name: "openrouter"
+    base_url: "https://openrouter.ai/api/v1"
+    api_key_env: "OPENROUTER_API_KEY"
+    models:
+      - id: "openai/gpt-4.1-mini"
+        tier: "mid"
+        cost_per_1k_prompt:    0.0004
+        cost_per_1k_completion: 0.0016
+      - id: "google/gemini-2.5-flash"
+        tier: "cheap"
+        cost_per_1k_prompt:    0.00015
+        cost_per_1k_completion: 0.0006
+      - id: "anthropic/claude-haiku-4-5"
+        tier: "mid"
+        cost_per_1k_prompt:    0.0008
+        cost_per_1k_completion: 0.004
+      - id: "anthropic/claude-sonnet-4-6"
+        tier: "premium"
+        cost_per_1k_prompt:    0.003
+        cost_per_1k_completion: 0.015
+      - id: "deepseek/deepseek-chat"
+        tier: "cheap"
+        cost_per_1k_prompt:    0.00027
+        cost_per_1k_completion: 0.0011
+      - id: "mistral/mistral-small"
+        tier: "mid"
+        cost_per_1k_prompt:    0.0002
+        cost_per_1k_completion: 0.0006
 
 # Routing rules
 routing:
@@ -94,13 +202,19 @@ safety_net:
 
 # License
 license:
-  key: ""
-  # Leave empty for Free tier. Pro key unlocks smart routing + safety net.
+  key: "tw_pro_YOUR_LICENSE_KEY_HERE"
+  # Pro license — smart routing + safety net + cache enabled.
+  # Generate a key with: tokenwise keygen --days 365
 
 # Response cache (Pro feature: avoids repeat API calls for identical prompts)
 cache:
   ttl_hours: 24       # Cache entries expire after 24 hours
   max_entries: 10000   # Maximum cached responses
+
+# Budget caps — set to 0 to disable (unlimited)
+budget:
+  daily_limit_usd: 0.0
+  monthly_limit_usd: 0.0
 
 # Storage
 storage:

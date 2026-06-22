@@ -1,0 +1,31 @@
+# TokenWise Core — Caddy reverse proxy with automatic Let's Encrypt TLS
+#
+# Replace the domain names below with your actual domains before deploying.
+# Caddy auto-provisions TLS certificates from Let's Encrypt (port 443 must be reachable).
+#
+# If you don't have a domain yet, use :80 for plain HTTP:
+#   http://:80 { ... }
+
+# ── Admin Dashboard ───────────────────────────────────────
+{$CADDY_DASHBOARD_DOMAIN:localhost} {
+    reverse_proxy tokenwise:9400
+    encode gzip
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+    }
+}
+
+# ── LLM Proxy (your app connects here) ────────────────────
+{$CADDY_PROXY_DOMAIN:localhost} {
+    reverse_proxy tokenwise:9401
+    encode gzip
+
+    # Security headers (proxy is API-only, no browser content)
+    header {
+        X-Content-Type-Options nosniff
+    }
+}

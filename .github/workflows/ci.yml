@@ -7,45 +7,50 @@ on:
     branches: [master, main]
   release:
     types: [published]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # ── Tests (Linux only, fastest) ─────────────────────
+  # ── Tests (all platforms) ──────────────────────────
   test:
-    name: Test (Linux)
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.96"
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v3
 
-      - run: cargo test --locked
-      - run: cargo test --locked --release
+      - name: Build
+        run: cargo build --release
+
+      - name: Test
+        run: cargo test --release
 
   # ── Clippy + fmt ────────────────────────────────────
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.96"
           components: clippy, rustfmt
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v3
 
-      - run: cargo fmt --check
+      - run: cargo fmt --all --check
       - run: cargo clippy -- -D warnings
 
-  # ── Build (all platforms) ───────────────────────────
+  # ── Build release binaries (all platforms) ─────────
   build:
     name: Build (${{ matrix.target }})
     needs: [test, lint]
@@ -53,53 +58,52 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             artifact: tokenwise
             archive: tokenwise-linux-amd64.tar.gz
-          - os: macos-latest
+          - os: macos-15
             target: x86_64-apple-darwin
             artifact: tokenwise
             archive: tokenwise-macos-amd64.tar.gz
-          - os: macos-latest
+          - os: macos-15
             target: aarch64-apple-darwin
             artifact: tokenwise
             archive: tokenwise-macos-arm64.tar.gz
-          - os: windows-latest
+          - os: windows-2025
             target: x86_64-pc-windows-msvc
             artifact: tokenwise.exe
             archive: tokenwise-windows-amd64.zip
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.96"
           target: ${{ matrix.target }}
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v3
 
       - name: Build release
         run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Strip binary (non-Windows)
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-2025'
         run: strip target/${{ matrix.target }}/release/${{ matrix.artifact }}
 
       - name: Package (Linux/macOS)
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-2025'
         run: |
           cd target/${{ matrix.target }}/release
           tar czf ${{ matrix.archive }} ${{ matrix.artifact }}
 
       - name: Package (Windows)
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-2025'
         run: |
           cd target/${{ matrix.target }}/release
           7z a ${{ matrix.archive }} ${{ matrix.artifact }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.archive }}
           path: target/${{ matrix.target }}/release/${{ matrix.archive }}
@@ -109,11 +113,11 @@ jobs:
     name: Docker (ghcr.io)
     if: github.event_name == 'release' && github.event.action == 'published'
     needs: [test, lint]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Login to ghcr.io
         uses: docker/login-action@v3
@@ -136,11 +140,11 @@ jobs:
     name: Create Release
     if: github.event_name == 'release' && github.event.action == 'published'
     needs: [build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: artifacts/
 

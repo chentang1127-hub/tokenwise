@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TokenWise — Savings</title>
+<title>TokenWise Core — Savings</title>
 <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
 <style>
   :root {
@@ -24,6 +24,7 @@
   .card .big { font-size: 36px; font-weight: 700; }
   .card .big.green { color: var(--green); }
   .card .sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
   .how-it-works { margin-top: 32px; }
   .how-it-works h2 { font-size: 18px; margin-bottom: 12px; }
   .how-it-works p { color: var(--muted); line-height: 1.7; font-size: 14px; }
@@ -33,49 +34,62 @@
 </head>
 <body hx-boost="true">
 <nav>
-  <span class="brand">⚡ TokenWise</span>
+  <span class="brand">⚡ TokenWise Core</span>
   <a href="/">Dashboard</a>
   <a href="/calls">Calls</a>
   <a href="/savings" class="active">Savings</a>
   <a href="{{ lang_toggle_url }}" class="lang-toggle">{{ lang_toggle_label }}</a>
 </nav>
 <main>
+
   <div class="card">
     <h3>This Month's API Cost</h3>
     <div class="big">{{ month_cost }}</div>
+    <div class="sub">across {{ total_calls }} calls</div>
   </div>
+
   {% if is_pro %}
   <div class="card">
-    <h3>Savings (Pro Routing)</h3>
-    <div class="big green">{{ estimated_savings }}</div>
-    <div class="sub">That's {{ savings_pct }} of what you would've paid using only GPT-4.1</div>
+    <h3>Cache Savings</h3>
+    <div class="big green">{{ cache_saved }}</div>
+    <div class="sub">{{ cache_count }} responses served from cache with $0 API cost</div>
+  </div>
+  <div class="card">
+    <h3>Routing Savings</h3>
+    <div class="big green">{{ routing_saved }}</div>
+    <div class="sub">{{ routing_count }} calls automatically routed to the cheapest capable model</div>
+  </div>
+  <div class="card">
+    <h3>Total Estimated Savings</h3>
+    <div class="big green">{{ total_saved }}</div>
+    <div class="sub">Combined cache + routing savings this month</div>
   </div>
   {% else %}
   <div class="card">
     <h3>Potential Savings with Pro</h3>
-    <div class="big green">{{ estimated_savings }}</div>
-    <div class="sub">That's {{ savings_pct }} of your current API spend you could save by upgrading.</div>
+    <div class="big green">{{ total_saved }}</div>
+    <div class="sub">Estimated savings from smart routing + response caching</div>
   </div>
   {% endif %}
 
   <div class="how-it-works">
-    <h2>How TokenWise Saves You Money</h2>
+    <h2>How TokenWise Core Saves You Money</h2>
     <p>
-      TokenWise analyzes every prompt your app sends. Simple tasks (summarization, translation,
-      classification) are routed to the cheapest capable model. Complex tasks (reasoning, code
-      generation, debugging) go to premium models.
+      <strong>1. Smart Routing.</strong> Simple tasks (summarization, translation, classification)
+      are routed to the cheapest capable model. Complex tasks (reasoning, code generation,
+      debugging) go to premium models. You don't pay premium prices for simple work.
     </p>
     <p style="margin-top:12px">
-      The savings estimate compares your actual cost against what you would have paid if every
-      single request went to the most expensive model in your configuration — usually
-      <code>gpt-4.1</code> or <code>claude-sonnet-4-6</code>.
+      <strong>2. Response Cache.</strong> Identical prompts within 24 hours are served from cache
+      with zero API cost. Perfect for repeated system prompts, test runs, and CI/CD pipelines.
     </p>
     <p style="margin-top:12px">
       Most users save <strong>70–90%</strong> on their API bills, because 60–80% of all LLM
       calls are simple tasks that don't need frontier models.
     </p>
   </div>
+
 </main>
-<div class="footer">TokenWise v0.1.0 · All data stored locally · Nothing leaves your machine</div>
+<div class="footer">TokenWise Core {{ version }} · All data stored locally · Nothing leaves your machine</div>
 </body>
 </html>

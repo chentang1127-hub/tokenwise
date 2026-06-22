@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TokenWise — 节省分析</title>
+<title>TokenWise Core — 节省分析</title>
 <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
 <style>
   :root {
@@ -24,6 +24,7 @@
   .card .big { font-size: 36px; font-weight: 700; }
   .card .big.green { color: var(--green); }
   .card .sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
   .how-it-works { margin-top: 32px; }
   .how-it-works h2 { font-size: 18px; margin-bottom: 12px; }
   .how-it-works p { color: var(--muted); line-height: 1.7; font-size: 14px; }
@@ -33,52 +34,65 @@
 </head>
 <body hx-boost="true">
 <nav>
-  <span class="brand">⚡ TokenWise</span>
+  <span class="brand">⚡ TokenWise Core</span>
   <a href="/">仪表板</a>
   <a href="/calls">调用记录</a>
   <a href="/savings" class="active">节省分析</a>
   <a href="{{ lang_toggle_url }}" class="lang-toggle">{{ lang_toggle_label }}</a>
 </nav>
 <main>
+
   <div class="card">
     <h3>本月 API 费用</h3>
     <div class="big">{{ month_cost }}</div>
+    <div class="sub">共 {{ total_calls }} 次调用</div>
   </div>
+
   {% if is_pro %}
   <div class="card">
-    <h3>已节省金额 (Pro 路由)</h3>
-    <div class="big green">{{ estimated_savings }}</div>
-    <div class="sub">相比只用 GPT-4.1，节省了 {{ savings_pct }} 费用</div>
+    <h3>缓存节省</h3>
+    <div class="big green">{{ cache_saved }}</div>
+    <div class="sub">{{ cache_count }} 次响应由缓存直接返回，零 API 成本</div>
+  </div>
+  <div class="card">
+    <h3>路由节省</h3>
+    <div class="big green">{{ routing_saved }}</div>
+    <div class="sub">{{ routing_count }} 次调用自动路由到性价比最优的模型</div>
+  </div>
+  <div class="card">
+    <h3>总计节省（估算）</h3>
+    <div class="big green">{{ total_saved }}</div>
+    <div class="sub">本月缓存 + 路由的合计节省</div>
   </div>
   {% else %}
   <div class="card">
     <h3>升级 Pro 可节省</h3>
-    <div class="big green">{{ estimated_savings }}</div>
-    <div class="sub">升级 Pro 后可节省当前费用的 {{ savings_pct }}</div>
+    <div class="big green">{{ total_saved }}</div>
+    <div class="sub">智能路由 + 响应缓存带来的估算节省</div>
   </div>
   {% endif %}
 
   <div class="how-it-works">
-    <h2>TokenWise 如何帮你省钱</h2>
+    <h2>TokenWise Core 如何帮你省钱</h2>
     <p>
-      TokenWise 分析你应用中发出的每一条提示词。简单任务（翻译、总结、
-      分类）路由到最便宜的模型；复杂任务（推理、代码生成、
-      调试）路由到高级模型。
+      <strong>1. 智能路由。</strong>简单任务（翻译、总结、分类）路由到最便宜的模型；
+      复杂任务（推理、代码生成、调试）路由到高级模型。不为简单工作支付高级价格。
     </p>
     <p style="margin-top:12px">
-      节省估算 = 对比你当前的混合路由成本 vs 所有调用都走最贵模型的成本。
-      通常最贵的模型是 <code>deepseek-reasoner</code> 或 <code>glm-4-plus</code>。
+      <strong>2. 响应缓存。</strong>24 小时内相同提示词直接从缓存返回，零 API 成本。
+      非常适合重复的系统提示词、测试运行和 CI/CD 流水线。
     </p>
     <p style="margin-top:12px">
       大多数用户能节省 <strong>70–90%</strong> 的 API 费用，因为 60–80% 的 LLM 调用
       其实都是简单任务，根本不需要昂贵的前沿模型。
     </p>
     <p style="margin-top:12px">
-      当前支持 8 家中国 AI 厂商：DeepSeek、智谱 GLM、通义千问、月之暗面 Kimi、
-      字节豆包、百度文心、MiniMax、零一万物 —— 一键切换，零代码修改。
+      当前配置支持多家 AI 厂商：DeepSeek、OpenAI、Anthropic、Google、Mistral、
+      xAI、Groq —— 一键切换，零代码修改。
     </p>
   </div>
+
 </main>
-<div class="footer">TokenWise v0.1.0 · 数据仅存储在本地 · 不外传任何信息</div>
+<div class="footer">TokenWise Core {{ version }} · 数据仅存储在本地 · 不外传任何信息</div>
 </body>
 </html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>429 — TokenWise Core</title>
+<style>
+  :root {
+    --bg: #0f172a; --card-bg: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --yellow: #eab308;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .container { text-align: center; max-width: 480px; padding: 48px 24px; }
+  .code { font-size: 96px; font-weight: 800; color: var(--yellow); opacity: 0.4; line-height: 1; }
+  .title { font-size: 24px; font-weight: 600; margin: 16px 0 8px; }
+  .desc { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 32px; }
+  .budget-info { font-size: 13px; color: var(--yellow); margin-bottom: 24px; padding: 12px; background: rgba(234,179,8,0.06); border: 1px solid rgba(234,179,8,0.15); border-radius: 8px; }
+  .btn { display: inline-block; padding: 10px 24px; background: var(--yellow); color: #000; font-weight: 600; border-radius: 8px; text-decoration: none; font-size: 14px; transition: opacity 0.15s; margin: 0 6px; }
+  .btn:hover { opacity: 0.9; }
+  .btn-ghost { background: transparent; border: 1px solid var(--yellow); color: var(--yellow); }
+  .footer { margin-top: 48px; font-size: 12px; color: var(--muted); opacity: 0.5; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="code">429</div>
+  <h1 class="title">请求频率限制</h1>
+  <p class="desc">已达到您配置的 API 调用预算上限。TokenWise Core 已暂停对外发送请求以保护您的账单。</p>
+  <div class="budget-info">请在 <code>config.yaml</code> 中检查预算设置 — 在 <code>budget:</code> 部分下可以调整每日/每月限额。</div>
+  <a href="/" class="btn">仪表板</a>
+  <a href="javascript:location.reload()" class="btn btn-ghost">重试</a>
+  <div class="footer">TokenWise Core {{ version }}</div>
+</div>
+</body>
+</html>

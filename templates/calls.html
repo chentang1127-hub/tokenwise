@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TokenWise — Calls</title>
+<title>TokenWise Core — Calls</title>
 <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
 <style>
   :root {
@@ -18,51 +18,172 @@
   nav a:hover, nav a.active { color: var(--text); background: rgba(255,255,255,0.05); }
   nav .brand { font-weight: 700; font-size: 18px; color: var(--green); }
   nav .lang-toggle { margin-left: auto; border: 1px solid var(--border); padding: 4px 10px; font-size: 12px; }
-  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
-  .section-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th { text-align: left; color: var(--muted); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  main { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+  /* Stats Bar */
+  .stats-bar { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat-mini { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; text-align: center; min-width: 100px; flex: 1; }
+  .stat-mini .num { font-size: 20px; font-weight: 700; }
+  .stat-mini .num.green { color: var(--green); }
+  .stat-mini .num.blue { color: var(--blue); }
+  .stat-mini .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+  /* Filter Tabs */
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .filter-group { display: flex; gap: 4px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+  .filter-pill { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; transition: all 0.12s; white-space: nowrap; }
+  .filter-pill:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+  .filter-pill.active { background: var(--blue); color: #fff; }
+  .filter-sep { width: 1px; background: var(--border); margin: 0 4px; align-self: stretch; }
+  .filter-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-right: 6px; font-weight: 600; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
   tr:hover { background: rgba(255,255,255,0.02); }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
-  .badge.simple { background: rgba(34,197,94,0.15); color: var(--green); }
-  .badge.medium { background: rgba(234,179,8,0.15); color: var(--yellow); }
-  .badge.complex { background: rgba(239,68,68,0.15); color: var(--red); }
+  .mono { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; }
+
+  /* Badges */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; font-family: inherit; }
+  .badge.simple { background: rgba(34,197,94,0.12); color: var(--green); }
+  .badge.medium { background: rgba(234,179,8,0.12); color: var(--yellow); }
+  .badge.complex { background: rgba(239,68,68,0.12); color: var(--red); }
+  .badge.eliminated { background: rgba(34,197,94,0.12); color: var(--green); }
+  .badge.routed { background: rgba(59,130,246,0.12); color: var(--blue); }
+  .badge.direct { background: rgba(148,163,184,0.08); color: var(--muted); }
+
+  /* Pagination */
+  .pagination { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 20px; font-size: 13px; }
+  .pagination a { color: var(--blue); text-decoration: none; padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; }
+  .pagination a:hover { background: rgba(59,130,246,0.08); }
+  .pagination .disabled { color: var(--muted); padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; opacity: 0.4; }
+  .pagination .info { color: var(--muted); padding: 0 8px; }
+
   .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty h3 { font-size: 16px; margin-bottom: 8px; }
+  .empty p { font-size: 13px; line-height: 1.6; max-width: 480px; margin: 0 auto; }
+  .empty code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
   .footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px; }
 </style>
 </head>
 <body hx-boost="true">
 <nav>
-  <span class="brand">⚡ TokenWise</span>
+  <span class="brand">⚡ TokenWise Core</span>
   <a href="/">Dashboard</a>
   <a href="/calls" class="active">Calls</a>
   <a href="/savings">Savings</a>
   <a href="{{ lang_toggle_url }}" class="lang-toggle">{{ lang_toggle_label }}</a>
 </nav>
 <main>
-  <h2 class="section-title">All API Calls</h2>
+
+  {% if stats.total_calls > 0 %}
+  <!-- Stats Summary Bar -->
+  <div class="stats-bar">
+    <div class="stat-mini">
+      <div class="num">{{ stats.total_calls }}</div>
+      <div class="lbl">Requests · {{ filters.range_label }}</div>
+    </div>
+    <div class="stat-mini">
+      <div class="num green">{{ stats.eliminated_count }}</div>
+      <div class="lbl">Eliminated · $0 cost</div>
+    </div>
+    <div class="stat-mini">
+      <div class="num blue">{{ stats.routed_count }}</div>
+      <div class="lbl">Routed · cheaper model</div>
+    </div>
+    <div class="stat-mini">
+      <div class="num">{{ stats.total_prompt_tokens }}</div>
+      <div class="lbl">Prompt Tokens</div>
+    </div>
+    <div class="stat-mini">
+      <div class="num">{{ stats.total_completion_tokens }}</div>
+      <div class="lbl">Completion Tokens</div>
+    </div>
+    <div class="stat-mini">
+      <div class="num">{{ stats.total_cost }}</div>
+      <div class="lbl">Total Cost</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <span class="filter-label">Time</span>
+    <div class="filter-group">
+      <a href="?range=all{% if filters.complexity != "all" %}&complexity={{ filters.complexity }}{% endif %}{% if filters.decision != "all" %}&decision={{ filters.decision }}{% endif %}" class="filter-pill {% if filters.range == "all" %}active{% endif %}">All</a>
+      <a href="?range=24h{% if filters.complexity != "all" %}&complexity={{ filters.complexity }}{% endif %}{% if filters.decision != "all" %}&decision={{ filters.decision }}{% endif %}" class="filter-pill {% if filters.range == "24h" %}active{% endif %}">24h</a>
+      <a href="?range=7d{% if filters.complexity != "all" %}&complexity={{ filters.complexity }}{% endif %}{% if filters.decision != "all" %}&decision={{ filters.decision }}{% endif %}" class="filter-pill {% if filters.range == "7d" %}active{% endif %}">7d</a>
+      <a href="?range=30d{% if filters.complexity != "all" %}&complexity={{ filters.complexity }}{% endif %}{% if filters.decision != "all" %}&decision={{ filters.decision }}{% endif %}" class="filter-pill {% if filters.range == "30d" %}active{% endif %}">30d</a>
+    </div>
+    <span class="filter-sep"></span>
+    <span class="filter-label">Task</span>
+    <div class="filter-group">
+      <a href="?range={{ filters.range }}{% if filters.decision != "all" %}&decision={{ filters.decision }}{% endif %}" class="filter-pill {% if filters.complexity == "all" %}active{% endif %}">All</a>
+      <a href="?range={{ filters.range }}&complexity=simple{% if filters.decision != "all" %}&decision={{ filters.decision }}{% endif %}" class="filter-pill {% if filters.complexity == "simple" %}active{% endif %}">Simple</a>
+      <a href="?range={{ filters.range }}&complexity=medium{% if filters.decision != "all" %}&decision={{ filters.decision }}{% endif %}" class="filter-pill {% if filters.complexity == "medium" %}active{% endif %}">Medium</a>
+      <a href="?range={{ filters.range }}&complexity=complex{% if filters.decision != "all" %}&decision={{ filters.decision }}{% endif %}" class="filter-pill {% if filters.complexity == "complex" %}active{% endif %}">Complex</a>
+    </div>
+    <span class="filter-sep"></span>
+    <span class="filter-label">Decision</span>
+    <div class="filter-group">
+      <a href="?range={{ filters.range }}{% if filters.complexity != "all" %}&complexity={{ filters.complexity }}{% endif %}" class="filter-pill {% if filters.decision == "all" %}active{% endif %}">All</a>
+      <a href="?range={{ filters.range }}&decision=eliminated{% if filters.complexity != "all" %}&complexity={{ filters.complexity }}{% endif %}" class="filter-pill {% if filters.decision == "eliminated" %}active{% endif %}">Eliminated</a>
+      <a href="?range={{ filters.range }}&decision=routed{% if filters.complexity != "all" %}&complexity={{ filters.complexity }}{% endif %}" class="filter-pill {% if filters.decision == "routed" %}active{% endif %}">Routed</a>
+      <a href="?range={{ filters.range }}&decision=direct{% if filters.complexity != "all" %}&complexity={{ filters.complexity }}{% endif %}" class="filter-pill {% if filters.decision == "direct" %}active{% endif %}">Direct</a>
+    </div>
+  </div>
+
   {% if calls.is_empty() %}
   <div class="empty">
-    <h3>No API calls yet</h3>
-    <p>Make some API requests and they'll appear here.</p>
+    <h3>No calls match these filters</h3>
+    <p>Try a wider time range or different filter combination.</p>
   </div>
   {% else %}
   <table>
-    <thead><tr><th>Model</th><th>Complexity</th><th>Latency</th><th>Cost</th></tr></thead>
+    <thead><tr>
+      <th>Model</th>
+      <th>Task</th>
+      <th>Decision</th>
+      <th>Prompt</th>
+      <th>Completion</th>
+      <th>Latency</th>
+      <th>Cost</th>
+      <th>Time</th>
+    </tr></thead>
     <tbody>
     {% for call in calls %}
     <tr>
-      <td>{{ call.model }}</td>
+      <td class="mono">{{ call.model }}</td>
       <td><span class="badge {{ call.complexity }}">{{ call.complexity }}</span></td>
-      <td>{{ call.latency }}</td>
-      <td>{{ call.cost }}</td>
+      <td><span class="badge {{ call.decision }}">{{ call.decision_label }}</span></td>
+      <td class="mono">{{ call.prompt_tokens }}</td>
+      <td class="mono">{{ call.completion_tokens }}</td>
+      <td class="mono">{{ call.latency }}</td>
+      <td class="mono">{{ call.cost }}</td>
+      <td class="mono">{{ call.ago }}</td>
     </tr>
     {% endfor %}
     </tbody>
   </table>
+
+  <!-- Pagination -->
+  <div class="pagination">
+    {% if filters.has_prev %}
+    <a href="?page={{ filters.page - 1 }}{% if filters.range != "all" %}&range={{ filters.range }}{% endif %}{% if filters.complexity != "all" %}&complexity={{ filters.complexity }}{% endif %}{% if filters.decision != "all" %}&decision={{ filters.decision }}{% endif %}">← Prev</a>
+    {% else %}
+    <span class="disabled">← Prev</span>
+    {% endif %}
+    <span class="info">Page {{ filters.page }} of {{ filters.total_pages }}</span>
+    {% if filters.has_next %}
+    <a href="?page={{ filters.page + 1 }}{% if filters.range != "all" %}&range={{ filters.range }}{% endif %}{% if filters.complexity != "all" %}&complexity={{ filters.complexity }}{% endif %}{% if filters.decision != "all" %}&decision={{ filters.decision }}{% endif %}">Next →</a>
+    {% else %}
+    <span class="disabled">Next →</span>
+    {% endif %}
+  </div>
   {% endif %}
+
 </main>
-<div class="footer">TokenWise v0.1.0 · All data stored locally · Nothing leaves your machine</div>
+<div class="footer">TokenWise Core {{ version }} · All data stored locally · Nothing leaves your machine</div>
 </body>
 </html>

@@ -15,7 +15,6 @@ pub struct CallRecord {
     pub cost_usd: f64,
     pub latency_ms: u64,
     pub fallback_used: bool,
-    #[allow(dead_code)]
     pub prompt_hash: String,
     pub finish_reason: Option<String>,
     /// Whether smart routing was actually applied (Pro only).
@@ -24,6 +23,8 @@ pub struct CallRecord {
     pub recommended_model: Option<String>,
     /// What the cost would have been with smart routing.
     pub estimated_optimal_cost: Option<f64>,
+    /// Tenant identifier — SHA-256 hash of the client's API key, or "anon".
+    pub tenant_id: String,
 }
 
 impl CallRecord {
@@ -51,6 +52,7 @@ impl CallRecord {
             was_routed: false,
             recommended_model: None,
             estimated_optimal_cost: None,
+            tenant_id: "anon".to_string(),
         }
     }
 
@@ -68,11 +70,10 @@ impl CallRecord {
         self
     }
 
-    /// Set the prompt hash.
+    /// Set the prompt hash (reserved for future use).
     #[allow(dead_code)]
-    pub fn with_prompt(self, prompt: &str) -> Self {
-        let mut this = self;
-        this.prompt_hash = Self::hash_prompt(prompt);
-        this
+    pub fn with_prompt(mut self, prompt: &str) -> Self {
+        self.prompt_hash = Self::hash_prompt(prompt);
+        self
     }
 }

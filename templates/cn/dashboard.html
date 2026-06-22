@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TokenWise — 仪表板</title>
+<title>TokenWise Core — 执行层</title>
 <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
 <style>
   :root {
@@ -18,112 +18,209 @@
   nav a:hover, nav a.active { color: var(--text); background: rgba(255,255,255,0.05); }
   nav .brand { font-weight: 700; font-size: 18px; color: var(--green); }
   nav .lang-toggle { margin-left: auto; border: 1px solid var(--border); padding: 4px 10px; font-size: 12px; }
-  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
-  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 32px; }
-  .kpi { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
-  .kpi .label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-  .kpi .value { font-size: 28px; font-weight: 700; }
-  .kpi .value.green { color: var(--green); }
-  .kpi .value.blue { color: var(--blue); }
-  .kpi .value.purple { color: var(--purple); }
-  .section-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th { text-align: left; color: var(--muted); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  tr:hover { background: rgba(255,255,255,0.02); }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
-  .badge.simple { background: rgba(34,197,94,0.15); color: var(--green); }
-  .badge.medium { background: rgba(234,179,8,0.15); color: var(--yellow); }
-  .badge.complex { background: rgba(239,68,68,0.15); color: var(--red); }
-  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
-  .empty h3 { font-size: 18px; margin-bottom: 8px; }
-  .upgrade-cta { background: linear-gradient(135deg, rgba(34,197,94,0.08), rgba(59,130,246,0.08)); border: 1px solid rgba(34,197,94,0.2); border-radius: 10px; padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; }
+  main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+
+  /* Hero */
+  .hero { text-align: center; padding: 28px 0 32px; }
+  .hero-value { font-size: 64px; font-weight: 800; color: var(--green); letter-spacing: -0.02em; line-height: 1.1; }
+  .hero-label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .hero-sub { font-size: 14px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+
+  /* Story Cards */
+  .story-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 32px; }
+  .story-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; display: flex; gap: 14px; align-items: flex-start; }
+  .story-icon { font-size: 22px; flex-shrink: 0; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.04); border-radius: 8px; }
+  .story-body { flex: 1; min-width: 0; }
+  .story-value { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.2; }
+  .story-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .story-sub { font-size: 12px; color: var(--green); margin-top: 4px; font-weight: 500; }
+
+  /* Chart */
+  .chart-section { margin-bottom: 28px; }
+  .chart-title { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .chart-container { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 10px 10px; overflow-x: auto; }
+  .chart-container svg { display: block; min-width: 500px; }
+
+  /* Upgrade CTA */
+  .upgrade-cta { background: linear-gradient(135deg, rgba(34,197,94,0.08), rgba(59,130,246,0.08)); border: 1px solid rgba(34,197,94,0.2); border-radius: 10px; padding: 16px 20px; margin-bottom: 28px; display: flex; align-items: center; gap: 16px; }
   .upgrade-cta .cta-text { flex: 1; font-size: 14px; color: var(--text); }
   .upgrade-cta .cta-btn { background: var(--green); color: #000; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 13px; text-decoration: none; white-space: nowrap; }
-  .upgrade-cta .cta-btn:hover { opacity: 0.9; }
+
+  /* Request Log (terminal style) */
+  .log-section { margin-bottom: 32px; }
+  .log-title { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .log-list { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; font-size: 13px; }
+  .log-line { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .log-line:last-child { border-bottom: none; }
+  .log-model { color: var(--text); font-weight: 600; min-width: 140px; }
+  .log-decision { font-size: 12px; padding: 2px 8px; border-radius: 99px; font-weight: 600; white-space: nowrap; }
+  .log-decision.eliminated { background: rgba(34,197,94,0.12); color: var(--green); }
+  .log-decision.routed { background: rgba(59,130,246,0.12); color: var(--blue); }
+  .log-decision.direct { background: rgba(148,163,184,0.08); color: var(--muted); }
+  .log-cost { color: var(--text); min-width: 80px; text-align: right; }
+  .log-ago { color: var(--muted); font-size: 12px; margin-left: auto; }
+  .log-empty { padding: 24px; text-align: center; color: var(--muted); font-family: inherit; font-size: 13px; }
+
+  /* FAQ */
+  .faq-section { margin-top: 44px; padding-top: 28px; border-top: 1px solid var(--border); }
+  .faq-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
+  .faq-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; }
+  .faq-item summary { padding: 13px 16px; font-size: 14px; font-weight: 500; cursor: pointer; user-select: none; list-style: none; color: var(--text); display: flex; justify-content: space-between; align-items: center; }
+  .faq-item summary::-webkit-details-marker { display: none; }
+  .faq-item summary::after { content: '+'; font-size: 18px; color: var(--muted); flex-shrink: 0; margin-left: 12px; }
+  .faq-item[open] summary::after { content: '\2212'; }
+  .faq-item summary:hover { background: rgba(255,255,255,0.02); }
+  .faq-item p { padding: 0 16px 14px; font-size: 13px; color: var(--muted); line-height: 1.65; }
+  .faq-item code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
   .footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px; }
 </style>
 </head>
 <body hx-boost="true">
 <nav>
-  <span class="brand">⚡ TokenWise</span>
+  <span class="brand">⚡ TokenWise Core</span>
   <a href="/" class="active">仪表板</a>
   <a href="/calls">调用记录</a>
   <a href="/savings">节省分析</a>
   <a href="{{ lang_toggle_url }}" class="lang-toggle">{{ lang_toggle_label }}</a>
 </nav>
 <main>
-  <div class="kpi-grid">
-    <div class="kpi">
-      <div class="label">本月调用次数</div>
-      <div class="value blue">{{ total_calls }}</div>
-    </div>
-    <div class="kpi">
-      <div class="label">API 费用</div>
-      <div class="value">{{ month_cost }}</div>
-    </div>
-    {% if is_pro %}
-    <div class="kpi">
-      <div class="label">已节省 (Pro 路由)</div>
-      <div class="value green">{{ estimated_savings }}</div>
-    </div>
-    <div class="kpi">
-      <div class="label">节省率</div>
-      <div class="value purple">{{ savings_pct }}</div>
-    </div>
-    {% else %}
-    <div class="kpi">
-      <div class="label">升级 Pro 可节省</div>
-      <div class="value green">{{ estimated_savings }}</div>
-    </div>
-    <div class="kpi">
-      <div class="label">可节省比例</div>
-      <div class="value purple">{{ savings_pct }}</div>
-    </div>
-    {% endif %}
-    {% if is_pro %}
-    <div class="kpi">
-      <div class="label">缓存条目</div>
-      <div class="value">{{ cache_entries }}</div>
-    </div>
-    <div class="kpi">
-      <div class="label">缓存命中</div>
-      <div class="value blue">{{ cache_hits }}</div>
-    </div>
-    {% endif %}
+
+  <!-- Hero -->
+  {% if is_pro && savings_pct != "N/A" %}
+  <div class="hero">
+    <div class="hero-label">无损成本优化</div>
+    <div class="hero-value">{{ savings_pct }}</div>
+    <div class="hero-sub">同等任务质量 &middot; 更低模型成本 &middot; {{ total_calls }} 次请求</div>
   </div>
+  {% else %}
+  <div class="hero">
+    <div class="hero-label">本月</div>
+    <div class="hero-value" style="color:var(--text)">{{ month_cost }}</div>
+    <div class="hero-sub">已处理 {{ total_calls }} 次请求</div>
+  </div>
+  {% endif %}
+
+  <!-- Story Cards -->
+  <div class="story-grid">
+    <div class="story-card">
+      <div class="story-icon">&#9889;</div>
+      <div class="story-body">
+        <div class="story-value">{{ cache_count }}</div>
+        <div class="story-label">请求被消除 &mdash; 零执行成本</div>
+        {% if is_pro && cache_saved != "$0.000000" %}
+        <div class="story-sub">节省 {{ cache_saved }}</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="story-card">
+      <div class="story-icon">&#128259;</div>
+      <div class="story-body">
+        <div class="story-value">{{ routing_count }}</div>
+        <div class="story-label">执行决策 &mdash; 更优模型，相同任务</div>
+        {% if is_pro && routing_count > 0 %}
+        <div class="story-sub">约节省 {{ routing_saved }}</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="story-card">
+      <div class="story-icon">&#128200;</div>
+      <div class="story-body">
+        <div class="story-value">{{ distinct_models }}</div>
+        <div class="story-label">执行层 &mdash; 自动选择管理的模型</div>
+        <div class="story-sub">零代码改动</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Token 成本图表 (内联 SVG) -->
+  {% if chart_models != "[]" && chart_models != "" %}
+  <div class="chart-section">
+    <div class="chart-title">各模型支出（本月）</div>
+    <div id="token-chart" class="chart-container"></div>
+  </div>
+  <script>
+  (function() {
+    var models = {{ chart_models }};
+    var costs = {{ chart_costs }};
+    var maxCost = {{ chart_max_cost }};
+    if (!models.length) return;
+    var w = 860, h = models.length * 36 + 20, barH = 28, gap = 8;
+    var padL = 130, padR = 80;
+    var svg = '<svg width="100%" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">';
+    var scale = maxCost > 0 ? (w - padL - padR) / maxCost : 1;
+    for (var i = 0; i < models.length; i++) {
+      var y = i * (barH + gap) + 10;
+      var bw = Math.max(costs[i] * scale, 2);
+      var pct = maxCost > 0 ? (costs[i] / maxCost * 100).toFixed(0) : 0;
+      var hue = 200 - (pct * 1.2);
+      svg += '<text x="' + (padL - 6) + '" y="' + (y + barH - 8) + '" text-anchor="end" fill="#94a3b8" font-size="11" font-family="inherit">' + models[i] + '</text>';
+      svg += '<rect x="' + padL + '" y="' + y + '" width="' + bw + '" height="' + barH + '" rx="4" fill="hsl(' + hue + ', 70%, 55%)" opacity="0.85"/>';
+      svg += '<text x="' + (padL + bw + 6) + '" y="' + (y + barH - 8) + '" fill="#e2e8f0" font-size="11" font-family="inherit">$' + costs[i].toFixed(4) + '</text>';
+    }
+    svg += '</svg>';
+    document.getElementById('token-chart').innerHTML = svg;
+  })();
+  </script>
+  {% endif %}
 
   {% if !is_pro %}
   <div class="upgrade-cta">
     <div class="cta-text">
-      <strong>💡 升级到 Pro</strong> — 解锁智能路由，每次 API 调用节省 {{ savings_pct }}。
+      <strong>&#128161; 升级到 Pro</strong> &mdash; 解锁智能路由 + 响应缓存，消除无效请求。
     </div>
-    <a href="https://afdian.com/a/tokenwise" class="cta-btn">购买 Pro →</a>
+    <a href="https://afdian.com/a/tokenwise" class="cta-btn">购买 Pro &rarr;</a>
   </div>
   {% endif %}
 
-  <h2 class="section-title">最近调用</h2>
-  {% if recent_calls.is_empty() %}
-  <div class="empty">
-    <h3>暂无 API 调用</h3>
-    <p>设置 <code>OPENAI_BASE_URL=http://localhost:9401/v1</code> 后开始使用。</p>
+  <!-- Request Log (terminal style) -->
+  <div class="log-section">
+    <div class="log-title">请求日志</div>
+    {% if recent_calls.is_empty() %}
+    <div class="log-list"><div class="log-empty">执行层已就绪 &mdash; 将你的应用指向 <code>http://127.0.0.1:9401/v1</code>，开始发送请求</div></div>
+    {% else %}
+    <div class="log-list">
+      {% for call in recent_calls %}
+      <div class="log-line">
+        <span class="log-model">{{ call.model }}</span>
+        <span class="log-decision {{ call.decision }}">{{ call.decision_label }}</span>
+        <span class="log-cost">{{ call.cost }}</span>
+        <span class="log-ago">{{ call.ago }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
-  {% else %}
-  <table>
-    <thead><tr><th>模型</th><th>复杂度</th><th>延迟</th><th>费用</th></tr></thead>
-    <tbody>
-    {% for call in recent_calls %}
-    <tr>
-      <td>{{ call.model }}</td>
-      <td><span class="badge {{ call.complexity }}">{{ call.complexity }}</span></td>
-      <td>{{ call.latency }}</td>
-      <td>{{ call.cost }}</td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
+
+  <!-- Try It (折叠) -->
+  {{ chat_widget|safe }}
+
+  <!-- 信任与隐私 FAQ -->
+  <section class="faq-section">
+    <h2 class="faq-title">&#128274; 信任与隐私</h2>
+
+    <details class="faq-item">
+      <summary>我的 API Key 存在哪里？</summary>
+      <p>您的 API Key <strong>仅保存在浏览器的 localStorage 中</strong>。调用时由浏览器直接发送给 AI 厂商，经过代理转发。TokenWise Core 的管理服务器<strong>永远不会收到您的 Key</strong>。这是零信任架构的核心：TokenWise Core 不需要持有您的 Key 就能工作。</p>
+    </details>
+
+    <details class="faq-item">
+      <summary>TokenWise Core 存储了哪些数据？</summary>
+      <p><strong>仅存储元数据：</strong>模型名、Token 数量、费用（美元）、延迟，以及您消息的 SHA-256 哈希（用于缓存去重）。<br><br><strong>消息内容不会被写入磁盘。</strong>哈希是单向指纹 &mdash; 无法逆向还原为原始文本。</p>
+    </details>
+
+    <details class="faq-item">
+      <summary>别人能看到我的对话内容吗？</summary>
+      <p><strong>不能。</strong>消息仅在 TokenWise Core 内存中临时处理 &mdash; 转发给 AI 厂商后，在完成 Token 计数和哈希计算后立即丢弃。只有哈希指纹被保留。仪表板上您可以看到：仅显示模型名、费用和延迟 &mdash; 从不显示消息文本。</p>
+    </details>
+
+    <details class="faq-item">
+      <summary>数据存在哪里？</summary>
+      <p>所有数据存储在 TokenWise Core 同目录下的<strong>本地 SQLite 文件</strong>（<code>tokenwise.db</code>）中。不会上传到云端或任何第三方服务。您可以随时删除 <code>tokenwise.db</code> 来清除所有记录。TokenWise Core 完全支持离线使用。</p>
+    </details>
+  </section>
+
 </main>
-<div class="footer">TokenWise v0.1.0 · 数据仅存储在本地 · 不外传任何信息</div>
+<div class="footer">TokenWise Core {{ version }} &middot; 数据仅存储在本地 &middot; 不外传任何信息</div>
 </body>
 </html>

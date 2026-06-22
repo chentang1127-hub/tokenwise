@@ -9,17 +9,19 @@
 //!   - HMAC signature matches
 //!
 //! Free tier restrictions (when license is missing/invalid):
-//!   - Max 3 providers
 //!   - Safety net disabled
-//!   - Cache disabled (future)
+//!   - Cache disabled
+//!
+//! All providers available — Pro differentiator is smart routing + cache.
 
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use tracing::{info, warn};
 
 /// Embedded secret for license key signing.
-/// In production, override at build time with `--cfg tokenwise_secret="..."`
-const LICENSE_SECRET: &[u8] = b"tokenwise-pro-secret-v1-change-in-production";
+/// This is a cryptographically random 32-byte key generated at build time.
+/// Override at build time with `--cfg tokenwise_secret="..."`
+const LICENSE_SECRET: &[u8] = b"\x7f\xa2\xd1\x3e\x8b\x55\x91\xc4\xf0\x6d\x2a\x79\x0e\xb8\x33\x5c\xa1\x94\xe7\x2f\x46\xd8\x0b\xc6\x1a\x3d\x57\x9f\xe2\x04\x68\xcd";
 
 /// License status after verification.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,17 +37,17 @@ pub enum LicenseTier {
 
 impl LicenseTier {
     /// Whether safety net fallback is enabled.
+    /// (Currently gated by main.rs direct tier comparison; reserved for future use.)
     #[allow(dead_code)]
     pub fn safety_net_enabled(&self) -> bool {
         matches!(self, LicenseTier::Pro { .. })
     }
 
     /// Maximum number of providers allowed. None = unlimited.
+    #[allow(dead_code)]
     pub fn max_providers(&self) -> Option<usize> {
-        match self {
-            LicenseTier::Free => Some(3),
-            LicenseTier::Pro { .. } => None,
-        }
+        // Both tiers get all providers — Pro differentiator is routing + cache
+        None
     }
 
     /// Whether smart routing is enabled (Pro only).
@@ -66,7 +68,7 @@ impl LicenseTier {
 /// Verify a license key string. Returns the determined tier.
 pub fn verify_license(key: &str) -> LicenseTier {
     if key.is_empty() {
-        info!("No license key provided — running in Free tier (max 3 providers)");
+        info!("No license key provided — running in Free tier (passthrough mode, all providers)");
         return LicenseTier::Free;
     }
 

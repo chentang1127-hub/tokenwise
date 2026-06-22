@@ -316,11 +316,11 @@ mod tests {
     fn test_simple_question_detection() {
         let cfg = test_config();
         assert_eq!(
-            classify(&vec![msg("Who is the president of France?")], None, &cfg),
+            classify(&[msg("Who is the president of France?")], None, &cfg),
             Complexity::Simple
         );
         assert_eq!(
-            classify(&vec![msg("Where is Tokyo?")], None, &cfg),
+            classify(&[msg("Where is Tokyo?")], None, &cfg),
             Complexity::Simple
         );
     }

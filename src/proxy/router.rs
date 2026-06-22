@@ -17,7 +17,9 @@ pub struct Route {
 
 /// Route a request based on complexity classification.
 ///
-/// Picks the cheapest model in the target tier.
+/// Picks the cheapest model in the target tier across ALL providers.
+/// This is used for the "recommended" route display (what Pro would do)
+/// and for cross-provider routing when TokenWise manages its own API keys.
 pub fn route(complexity: Complexity, config: &Config) -> Route {
     let tier_name = match complexity {
         Complexity::Simple => &config.routing.tier_simple,
@@ -32,8 +34,8 @@ pub fn route(complexity: Complexity, config: &Config) -> Route {
         (p, m)
     });
 
-    let api_key = std::env::var(&provider.api_key_env).unwrap_or_default();
-
+    // api_key left empty — try_upstream will forward the client's
+    // Authorization header instead. TokenWise never holds keys.
     info!(
         "📌 Routed [{}] → {}/{} (${:.6}/1K prompt, ${:.6}/1K completion)",
         tier_name, provider.name, model.id, model.cost_per_1k_prompt, model.cost_per_1k_completion,
@@ -43,19 +45,50 @@ pub fn route(complexity: Complexity, config: &Config) -> Route {
         provider: provider.name.clone(),
         model: model.id.clone(),
         base_url: provider.base_url.clone(),
-        api_key,
+        api_key: String::new(),
         tier: tier_name.to_string(),
     }
 }
 
+/// Route within a specific provider — picks the cheapest model in the
+/// target tier from THAT provider only. Essential for zero-trust mode:
+/// the client's API key only works for their own provider.
+pub fn route_within_provider(
+    complexity: Complexity,
+    config: &Config,
+    provider_name: &str,
+) -> Option<Route> {
+    let tier_name = match complexity {
+        Complexity::Simple => &config.routing.tier_simple,
+        Complexity::Medium => &config.routing.tier_default,
+        Complexity::Complex => &config.routing.tier_complex,
+    };
+
+    let model = config.cheapest_model_in_tier_for_provider(provider_name, tier_name)?;
+    let provider = config.providers.iter().find(|p| p.name == provider_name)?;
+
+    info!(
+        "📌 Routed [{}] within {} → {}/{} (${:.6}/1K prompt, ${:.6}/1K completion)",
+        tier_name, provider_name, provider.name, model.id, model.cost_per_1k_prompt, model.cost_per_1k_completion,
+    );
+
+    Some(Route {
+        provider: provider.name.clone(),
+        model: model.id.clone(),
+        base_url: provider.base_url.clone(),
+        api_key: String::new(),
+        tier: tier_name.to_string(),
+    })
+}
+
 /// Get fallback route: if a cheap model fails, escalate to the next tier.
+/// Searches ALL providers for the cheapest model in the fallback tier.
 pub fn fallback_route(previous_tier: &str, config: &Config) -> Option<Route> {
     let next_tier = config.safety_net.fallback_map.get(previous_tier)?;
 
     let (provider, model) = config.cheapest_model_in_tier(next_tier)?;
 
-    let api_key = std::env::var(&provider.api_key_env).unwrap_or_default();
-
+    // api_key left empty — try_upstream forwards the client's Authorization header.
     info!(
         "🔄 Fallback [{}] → [{}] {}/{}",
         previous_tier, next_tier, provider.name, model.id,
@@ -65,7 +98,33 @@ pub fn fallback_route(previous_tier: &str, config: &Config) -> Option<Route> {
         provider: provider.name.clone(),
         model: model.id.clone(),
         base_url: provider.base_url.clone(),
-        api_key,
+        api_key: String::new(),
+        tier: next_tier.to_string(),
+    })
+}
+
+/// Get fallback route within a specific provider. Escalates to the next tier
+/// but only considers models from the SAME provider. In zero-trust mode,
+/// the client's API key only works for their own provider.
+pub fn fallback_route_within_provider(
+    previous_tier: &str,
+    config: &Config,
+    provider_name: &str,
+) -> Option<Route> {
+    let next_tier = config.safety_net.fallback_map.get(previous_tier)?;
+    let model = config.cheapest_model_in_tier_for_provider(provider_name, next_tier)?;
+    let provider = config.providers.iter().find(|p| p.name == provider_name)?;
+
+    info!(
+        "🔄 Fallback [{}] → [{}] within {} → {}/{}",
+        previous_tier, next_tier, provider_name, provider.name, model.id,
+    );
+
+    Some(Route {
+        provider: provider.name.clone(),
+        model: model.id.clone(),
+        base_url: provider.base_url.clone(),
+        api_key: String::new(),
         tier: next_tier.to_string(),
     })
 }
@@ -73,7 +132,7 @@ pub fn fallback_route(previous_tier: &str, config: &Config) -> Option<Route> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Config, ModelConfig, ProviderConfig, RoutingConfig, SafetyNetConfig};
+    use crate::config::{BudgetConfig, Config, ModelConfig, ProviderConfig, RoutingConfig, SafetyNetConfig};
     use std::collections::HashMap;
 
     fn test_config() -> Config {
@@ -137,6 +196,9 @@ mod tests {
                 max_entries: 10000,
             },
             locale: "en".into(),
+            headless: false,
+            budget: BudgetConfig::default(),
+            webhook: crate::webhooks::WebhookConfig::default(),
         }
     }
 

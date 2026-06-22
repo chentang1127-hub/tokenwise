@@ -4,3 +4,6 @@
 *.db-shm
 .env
 tokenwise.log
+.tokenwise_setup_done
+.codegraph/
+*.bak

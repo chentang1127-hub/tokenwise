@@ -1,0 +1,58 @@
+# TokenWise Core — systemd service
+#
+# Installation:
+#   sudo cp deploy/tokenwise.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now tokenwise
+#
+# Requirements:
+#   - Binary at /usr/local/bin/tokenwise
+#   - Config at /etc/tokenwise/config.yaml
+#   - Data directory at /var/lib/tokenwise/
+
+[Unit]
+Description=TokenWise Core — LLM execution layer proxy
+Documentation=https://github.com/chentang1127-hub/tokenwise
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tokenwise
+Group=tokenwise
+
+# Working directory — SQLite database is created here
+WorkingDirectory=/var/lib/tokenwise
+
+# Path to the release binary
+ExecStart=/usr/local/bin/tokenwise start --config /etc/tokenwise/config.yaml
+
+# Graceful shutdown: SIGTERM → checkpoint WAL → exit
+ExecStop=/bin/kill -TERM $MAINPID
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/tokenwise
+ReadOnlyPaths=/etc/tokenwise/config.yaml
+
+# Logging — respects RUST_LOG env var
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tokenwise
+
+# Environment overrides (optional)
+# Environment="RUST_LOG=info,tokenwise=debug"
+# Environment="TW_DB_PATH=/var/lib/tokenwise/tokenwise.db"
+
+[Install]
+WantedBy=multi-user.target

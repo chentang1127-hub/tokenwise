@@ -30,6 +30,14 @@ impl Store {
         })
     }
 
+    /// Quick health check — runs a simple query to verify DB connectivity.
+    pub fn health_check(&self) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| format!("lock: {e}"))?;
+        conn.query_row("SELECT 1", [], |_| Ok(()))
+            .map_err(|e| format!("query: {e}"))?;
+        Ok(())
+    }
+
     fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         // Main schema — create tables if they don't exist
         conn.execute_batch(
@@ -49,7 +57,8 @@ impl Store {
                 finish_reason   TEXT,
                 was_routed      INTEGER NOT NULL DEFAULT 0,
                 recommended_model TEXT,
-                estimated_optimal_cost REAL
+                estimated_optimal_cost REAL,
+                tenant_id       TEXT NOT NULL DEFAULT 'anon'
             );
 
             CREATE INDEX IF NOT EXISTS idx_calls_ts ON calls(timestamp);
@@ -87,7 +96,25 @@ impl Store {
         ] {
             let _ = conn.execute(col_sql, []);
         }
+        // v0.2.0: multi-tenant support
+        let _ = conn.execute(
+            "ALTER TABLE calls ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'anon'",
+            [],
+        );
+        // Add index for tenant-scoped queries
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_calls_tenant ON calls(tenant_id)",
+            [],
+        );
         Ok(())
+    }
+
+    /// Force WAL checkpoint — flushes all data to the main DB file.
+    /// Call on graceful shutdown to prevent data loss.
+    pub fn checkpoint(&self) {
+        if let Ok(conn) = self.conn.lock() {
+            let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
+        }
     }
 
     // ── Response cache (Pro feature) ─────────────────
@@ -191,8 +218,8 @@ impl Store {
         let prompt_hash = CallRecord::hash_prompt(&prompt_text);
 
         conn.execute(
-            "INSERT INTO calls (id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason, was_routed, recommended_model, estimated_optimal_cost)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            "INSERT INTO calls (id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason, was_routed, recommended_model, estimated_optimal_cost, tenant_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
             rusqlite::params![
                 rec.id,
                 rec.timestamp,
@@ -209,6 +236,7 @@ impl Store {
                 rec.was_routed as i32,
                 rec.recommended_model,
                 rec.estimated_optimal_cost,
+                rec.tenant_id,
             ],
         )?;
 
@@ -234,14 +262,26 @@ impl Store {
     pub fn recent_calls(
         &self,
         limit: usize,
+        tenant_id: Option<&str>,
     ) -> Result<Vec<CallRecord>, Box<dyn std::error::Error>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason, was_routed, recommended_model, estimated_optimal_cost
-             FROM calls ORDER BY timestamp DESC LIMIT ?1",
-        )?;
+        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(tid) = tenant_id {
+            (
+                "SELECT id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason, was_routed, recommended_model, estimated_optimal_cost, tenant_id
+                 FROM calls WHERE tenant_id = ?1 ORDER BY timestamp DESC LIMIT ?2".to_string(),
+                vec![Box::new(tid.to_string()), Box::new(limit as i64)],
+            )
+        } else {
+            (
+                "SELECT id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason, was_routed, recommended_model, estimated_optimal_cost, tenant_id
+                 FROM calls ORDER BY timestamp DESC LIMIT ?1".to_string(),
+                vec![Box::new(limit as i64)],
+            )
+        };
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let mut stmt = conn.prepare(&sql)?;
 
-        let rows = stmt.query_map(rusqlite::params![limit as i64], |row| {
+        let rows = stmt.query_map(param_refs.as_slice(), |row| {
             Ok(CallRecord {
                 id: row.get(0)?,
                 timestamp: row.get(1)?,
@@ -258,23 +298,303 @@ impl Store {
                 was_routed: row.get::<_, i32>(12)? != 0,
                 recommended_model: row.get(13)?,
                 estimated_optimal_cost: row.get(14)?,
+                tenant_id: row.get(15)?,
             })
         })?;
 
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
+    /// Estimate dollars saved by cache hits this month.
+    /// For each cached entry with hit_count > 1, each extra hit
+    /// avoided an API call. Uses stored token counts × a conservative
+    /// nominal rate ($0.00015/1K prompt + $0.0006/1K completion).
+    pub fn cache_savings_estimate(&self) -> f64 {
+        let conn = self.conn.lock().unwrap();
+        // Conservative rate: roughly gemini-flash level, cheaper than any real model
+        const NOMINAL_PROMPT_RATE: f64 = 0.00015;
+        const NOMINAL_COMPLETION_RATE: f64 = 0.0006;
+        let savings: f64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(
+                    (hit_count - 1) *
+                    (prompt_tokens * ?1 / 1000.0 + completion_tokens * ?2 / 1000.0)
+                 ), 0.0) FROM cache WHERE hit_count > 1",
+                rusqlite::params![NOMINAL_PROMPT_RATE, NOMINAL_COMPLETION_RATE],
+                |row| row.get(0),
+            )
+            .unwrap_or(0.0);
+        savings
+    }
+
+    /// Count routed calls this month.
+    pub fn routing_count(&self, tenant_id: Option<&str>) -> i64 {
+        let conn = self.conn.lock().unwrap();
+        let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
+        if let Some(tid) = tenant_id {
+            conn.query_row(
+                "SELECT COUNT(*) FROM calls WHERE was_routed = 1 AND date(timestamp, 'unixepoch') >= ?1 AND tenant_id = ?2",
+                rusqlite::params![month_start, tid],
+                |row| row.get(0),
+            ).unwrap_or(0)
+        } else {
+            conn.query_row(
+                "SELECT COUNT(*) FROM calls WHERE was_routed = 1 AND date(timestamp, 'unixepoch') >= ?1",
+                rusqlite::params![month_start],
+                |row| row.get(0),
+            ).unwrap_or(0)
+        }
+    }
+
+    /// Count distinct models used this month.
+    pub fn distinct_models(&self, tenant_id: Option<&str>) -> i64 {
+        let conn = self.conn.lock().unwrap();
+        let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
+        if let Some(tid) = tenant_id {
+            conn.query_row(
+                "SELECT COUNT(DISTINCT model) FROM calls WHERE date(timestamp, 'unixepoch') >= ?1 AND tenant_id = ?2",
+                rusqlite::params![month_start, tid],
+                |row| row.get(0),
+            ).unwrap_or(0)
+        } else {
+            conn.query_row(
+                "SELECT COUNT(DISTINCT model) FROM calls WHERE date(timestamp, 'unixepoch') >= ?1",
+                rusqlite::params![month_start],
+                |row| row.get(0),
+            ).unwrap_or(0)
+        }
+    }
+
+    /// Get calls with optional filters: time range, complexity, decision type, pagination.
+    pub fn recent_calls_filtered(
+        &self,
+        limit: usize,
+        offset: usize,
+        range_hours: Option<u32>,
+        complexity: Option<&str>,
+        decision: Option<&str>,
+        tenant_id: Option<&str>,
+    ) -> Result<Vec<CallRecord>, Box<dyn std::error::Error>> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().timestamp();
+
+        // Build query dynamically but with parameterized values
+        let base = "SELECT id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason, was_routed, recommended_model, estimated_optimal_cost, tenant_id FROM calls WHERE 1=1";
+        let mut conditions = String::new();
+        let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+
+        if let Some(h) = range_hours {
+            conditions.push_str(" AND timestamp >= ?");
+            params.push(Box::new(now - (h as i64 * 3600)));
+        }
+        if let Some(c) = complexity {
+            conditions.push_str(" AND complexity = ?");
+            params.push(Box::new(c.to_string()));
+        }
+        match decision {
+            Some("eliminated") => {
+                // Cache hits: zero cost + near-instant latency
+                conditions.push_str(" AND cost_usd = 0.0 AND latency_ms < 10");
+            }
+            Some("routed") => {
+                conditions.push_str(" AND was_routed = 1");
+            }
+            Some("direct") => {
+                conditions.push_str(" AND was_routed = 0 AND (cost_usd > 0.0 OR latency_ms >= 10)");
+            }
+            _ => {}
+        }
+        if let Some(tid) = tenant_id {
+            conditions.push_str(" AND tenant_id = ?");
+            params.push(Box::new(tid.to_string()));
+        }
+
+        let sql = format!("{base}{conditions} ORDER BY timestamp DESC LIMIT ? OFFSET ?");
+        params.push(Box::new(limit as i64));
+        params.push(Box::new(offset as i64));
+
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(param_refs.as_slice(), |row| {
+            Ok(CallRecord {
+                id: row.get(0)?,
+                timestamp: row.get(1)?,
+                model: row.get(2)?,
+                provider: row.get(3)?,
+                complexity: row.get(4)?,
+                prompt_tokens: row.get(5)?,
+                completion_tokens: row.get(6)?,
+                cost_usd: row.get(7)?,
+                latency_ms: row.get(8)?,
+                fallback_used: row.get::<_, i32>(9)? != 0,
+                prompt_hash: row.get(10)?,
+                finish_reason: row.get(11)?,
+                was_routed: row.get::<_, i32>(12)? != 0,
+                recommended_model: row.get(13)?,
+                estimated_optimal_cost: row.get(14)?,
+                tenant_id: row.get(15)?,
+            })
+        })?;
+
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// Count calls matching filters (for pagination).
+    pub fn calls_count_filtered(
+        &self,
+        range_hours: Option<u32>,
+        complexity: Option<&str>,
+        decision: Option<&str>,
+        tenant_id: Option<&str>,
+    ) -> Result<i64, Box<dyn std::error::Error>> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().timestamp();
+
+        let base = "SELECT COUNT(*) FROM calls WHERE 1=1";
+        let mut conditions = String::new();
+        let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+
+        if let Some(h) = range_hours {
+            conditions.push_str(" AND timestamp >= ?");
+            params.push(Box::new(now - (h as i64 * 3600)));
+        }
+        if let Some(c) = complexity {
+            conditions.push_str(" AND complexity = ?");
+            params.push(Box::new(c.to_string()));
+        }
+        match decision {
+            Some("eliminated") => {
+                conditions.push_str(" AND cost_usd = 0.0 AND latency_ms < 10");
+            }
+            Some("routed") => {
+                conditions.push_str(" AND was_routed = 1");
+            }
+            Some("direct") => {
+                conditions.push_str(" AND was_routed = 0 AND (cost_usd > 0.0 OR latency_ms >= 10)");
+            }
+            _ => {}
+        }
+        if let Some(tid) = tenant_id {
+            conditions.push_str(" AND tenant_id = ?");
+            params.push(Box::new(tid.to_string()));
+        }
+
+        let sql = format!("{base}{conditions}");
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let count: i64 = conn.query_row(&sql, param_refs.as_slice(), |row| row.get(0))?;
+        Ok(count)
+    }
+
+    /// Aggregate stats for a time range (for the calls page summary bar).
+    pub fn calls_summary(
+        &self,
+        range_hours: Option<u32>,
+        tenant_id: Option<&str>,
+    ) -> Result<CallsSummary, Box<dyn std::error::Error>> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().timestamp();
+
+        let mut conditions = if let Some(h) = range_hours {
+            format!("timestamp >= {}", now - (h as i64 * 3600))
+        } else {
+            "1=1".to_string()
+        };
+        if let Some(tid) = tenant_id {
+            conditions.push_str(&format!(" AND tenant_id = '{}'", tid.replace('\'', "''")));
+        }
+
+        let sql = format!(
+            "SELECT COUNT(*), COALESCE(SUM(prompt_tokens),0), COALESCE(SUM(completion_tokens),0),
+                    COALESCE(SUM(cost_usd),0.0), COALESCE(AVG(latency_ms),0),
+                    COALESCE(SUM(CASE WHEN cost_usd = 0.0 AND latency_ms < 10 THEN 1 ELSE 0 END),0),
+                    COALESCE(SUM(CASE WHEN was_routed = 1 THEN 1 ELSE 0 END),0)
+             FROM calls WHERE {conditions}"
+        );
+
+        let stats = conn.query_row(&sql, [], |row| {
+            Ok(CallsSummary {
+                total: row.get(0)?,
+                total_prompt_tokens: row.get(1)?,
+                total_completion_tokens: row.get(2)?,
+                total_cost: row.get(3)?,
+                avg_latency_ms: row.get(4)?,
+                eliminated_count: row.get(5)?,
+                routed_count: row.get(6)?,
+            })
+        })?;
+
+        Ok(stats)
+    }
+
+    /// Token distribution by model for the current month (for charts).
+    pub fn token_distribution(&self, tenant_id: Option<&str>) -> Result<Vec<ModelTokenStats>, Box<dyn std::error::Error>> {
+        let conn = self.conn.lock().unwrap();
+        let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
+        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(tid) = tenant_id {
+            (
+                "SELECT model, COUNT(*), COALESCE(SUM(prompt_tokens),0), COALESCE(SUM(completion_tokens),0), COALESCE(SUM(cost_usd),0.0)
+                 FROM calls WHERE date(timestamp, 'unixepoch') >= ?1 AND tenant_id = ?2
+                 GROUP BY model ORDER BY SUM(cost_usd) DESC LIMIT 10".to_string(),
+                vec![Box::new(month_start), Box::new(tid.to_string())],
+            )
+        } else {
+            (
+                "SELECT model, COUNT(*), COALESCE(SUM(prompt_tokens),0), COALESCE(SUM(completion_tokens),0), COALESCE(SUM(cost_usd),0.0)
+                 FROM calls WHERE date(timestamp, 'unixepoch') >= ?1
+                 GROUP BY model ORDER BY SUM(cost_usd) DESC LIMIT 10".to_string(),
+                vec![Box::new(month_start)],
+            )
+        };
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let mut stmt = conn.prepare(&sql)?;
+
+        let rows = stmt.query_map(param_refs.as_slice(), |row| {
+            Ok(ModelTokenStats {
+                model: row.get(0)?,
+                call_count: row.get(1)?,
+                prompt_tokens: row.get(2)?,
+                completion_tokens: row.get(3)?,
+                total_cost: row.get(4)?,
+            })
+        })?;
+
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// Check if total cost exceeds budget limit for a time window.
+    pub fn total_cost_since(&self, since_ts: i64) -> f64 {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT COALESCE(SUM(cost_usd), 0.0) FROM calls WHERE timestamp >= ?1",
+            rusqlite::params![since_ts],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0)
+    }
+
     /// Get aggregate stats for the current month.
-    pub fn monthly_stats(&self) -> Result<MonthlyStats, Box<dyn std::error::Error>> {
+    pub fn monthly_stats(&self, tenant_id: Option<&str>) -> Result<MonthlyStats, Box<dyn std::error::Error>> {
         let conn = self.conn.lock().unwrap();
         let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
 
-        let stats = conn.query_row(
-            "SELECT COUNT(*), COALESCE(SUM(prompt_tokens), 0), COALESCE(SUM(completion_tokens), 0), COALESCE(SUM(cost_usd), 0.0), COALESCE(AVG(latency_ms), 0),
-                    COALESCE(SUM(CASE WHEN was_routed = 0 AND estimated_optimal_cost IS NOT NULL THEN cost_usd - estimated_optimal_cost ELSE 0 END), 0.0)
-             FROM calls WHERE date(timestamp, 'unixepoch') >= ?1",
-            rusqlite::params![month_start],
-            |row| {
+        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(tid) = tenant_id {
+            (
+                "SELECT COUNT(*), COALESCE(SUM(prompt_tokens), 0), COALESCE(SUM(completion_tokens), 0), COALESCE(SUM(cost_usd), 0.0), COALESCE(AVG(latency_ms), 0),
+                        COALESCE(SUM(CASE WHEN was_routed = 0 AND estimated_optimal_cost IS NOT NULL THEN cost_usd - estimated_optimal_cost ELSE 0 END), 0.0)
+                 FROM calls WHERE date(timestamp, 'unixepoch') >= ?1 AND tenant_id = ?2".to_string(),
+                vec![Box::new(month_start), Box::new(tid.to_string())],
+            )
+        } else {
+            (
+                "SELECT COUNT(*), COALESCE(SUM(prompt_tokens), 0), COALESCE(SUM(completion_tokens), 0), COALESCE(SUM(cost_usd), 0.0), COALESCE(AVG(latency_ms), 0),
+                        COALESCE(SUM(CASE WHEN was_routed = 0 AND estimated_optimal_cost IS NOT NULL THEN cost_usd - estimated_optimal_cost ELSE 0 END), 0.0)
+                 FROM calls WHERE date(timestamp, 'unixepoch') >= ?1".to_string(),
+                vec![Box::new(month_start)],
+            )
+        };
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+
+        let stats = conn.query_row(&sql, param_refs.as_slice(), |row| {
                 Ok(MonthlyStats {
                     total_calls: row.get(0)?,
                     total_prompt_tokens: row.get(1)?,
@@ -291,21 +611,45 @@ impl Store {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct CacheStats {
     pub total_entries: i64,
     pub total_hits: i64,
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct MonthlyStats {
-    pub total_calls: i64,
+pub struct CallsSummary {
+    pub total: i64,
     pub total_prompt_tokens: i64,
     pub total_completion_tokens: i64,
     pub total_cost: f64,
+    #[allow(dead_code)]
     pub avg_latency_ms: f64,
-    /// What Free-tier users could save with Pro routing.
+    pub eliminated_count: i64,
+    pub routed_count: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct ModelTokenStats {
+    pub model: String,
+    pub call_count: i64,
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+    pub total_cost: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct MonthlyStats {
+    pub total_calls: i64,
+    #[allow(dead_code)]
+    pub total_prompt_tokens: i64,
+    #[allow(dead_code)]
+    pub total_completion_tokens: i64,
+    pub total_cost: f64,
+    /// Average latency in ms (reserved for future dashboard use).
+    #[allow(dead_code)]
+    pub avg_latency_ms: f64,
+    /// What Free-tier users could save with Pro routing (reserved).
+    #[allow(dead_code)]
     pub potential_savings: f64,
 }
 
@@ -326,7 +670,7 @@ mod tests {
         store
             .record_call(&rec, &request)
             .expect("record_call failed");
-        let recent = store.recent_calls(10).unwrap();
+        let recent = store.recent_calls(10, None).unwrap();
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0].model, "test-model");
     }
@@ -334,7 +678,7 @@ mod tests {
     #[test]
     fn test_monthly_stats_empty() {
         let store = Store::new(":memory:").expect("Failed to open in-memory store");
-        let stats = store.monthly_stats().unwrap();
+        let stats = store.monthly_stats(None).unwrap();
         assert_eq!(stats.total_calls, 0);
         assert_eq!(stats.total_cost, 0.0);
     }

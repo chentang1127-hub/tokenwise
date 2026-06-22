@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TokenWise Core — 安装向导</title>
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a; --card-bg: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --green: #22c55e; --blue: #3b82f6;
+    --purple: #a855f7; --red: #ef4444;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .container { width: 100%; max-width: 600px; margin: 24px; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 32px; }
+  .logo { font-size: 24px; font-weight: 700; color: var(--green); text-align: center; margin-bottom: 8px; }
+  .tagline { text-align: center; font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .lang-link { float: right; font-size: 12px; color: var(--muted); text-decoration: none; border: 1px solid var(--border); padding: 4px 10px; border-radius: 6px; }
+  .lang-link:hover { color: var(--text); }
+
+  /* Stepper */
+  .stepper { display: flex; justify-content: center; gap: 12px; margin-bottom: 32px; }
+  .step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .step .dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; border: 2px solid var(--border); background: transparent; }
+  .step.active .dot { border-color: var(--green); background: rgba(34,197,94,0.1); color: var(--green); }
+  .step.done .dot { border-color: var(--green); background: var(--green); color: #000; }
+
+  .step-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .step-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+
+  /* Provider cards */
+  .provider-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .provider-option { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.15s; }
+  .provider-option:hover { border-color: var(--blue); background: rgba(59,130,246,0.05); }
+  .provider-option input[type="checkbox"] { accent-color: var(--green); width: 18px; height: 18px; cursor: pointer; }
+  .provider-option .info { flex: 1; }
+  .provider-option .info .name { font-weight: 600; font-size: 14px; }
+  .provider-option .info .desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* Buttons */
+  .btn { display: inline-block; padding: 10px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; }
+  .btn-primary { background: var(--green); color: #000; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+  .btn-row { display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
+
+  /* Step 2 */
+  .done-icon { text-align: center; font-size: 48px; margin-bottom: 16px; }
+  .info-card { background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.2); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .info-card p { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .info-card p:last-child { margin-bottom: 0; }
+  .url-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 14px; color: var(--green); text-align: center; margin: 16px 0; word-break: break-all; }
+  .copy-btn { padding: 8px 20px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid var(--green); background: transparent; color: var(--green); font-weight: 600; }
+  .copy-btn:hover { background: var(--green); color: #000; }
+  .highlight { color: var(--green); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <a href="{{ lang_toggle_url }}" class="lang-link">{{ lang_toggle_label }}</a>
+    <div class="logo">⚡ TokenWise Core</div>
+    <div class="tagline">节省 70–90% AI API 费用，无需提供你的密钥。</div>
+
+    <!-- Stepper -->
+    <div class="stepper">
+      <div class="step{% if step >= 1 %} active{% endif %}{% if step > 1 %} done{% endif %}">
+        <span class="dot">{% if step > 1 %}&check;{% else %}1{% endif %}</span>
+        <span>连接</span>
+      </div>
+      <div class="step{% if step >= 2 %} active{% endif %}">
+        <span class="dot">2</span>
+        <span>完成</span>
+      </div>
+    </div>
+
+    <div id="wizard-body">
+      {% if step == 1 %}
+      <!-- ─── Step 1: 连接 ─── -->
+      <h2 class="step-title">设置你的 Base URL</h2>
+      <p class="step-subtitle">将你的应用指向 TokenWise Core，你的 API 密钥原样转发，我们不会看到。</p>
+
+      <div class="info-card">
+        <p><strong>🔐 零信任。</strong> TokenWise Core 直接转发你的 <code>Authorization</code> 请求头到 AI 厂商，密钥不会经过我们的配置。</p>
+        <p><strong>📊 成本追踪。</strong> 每次调用都记录在本地，清楚看到每一分钱花在哪里。</p>
+        <p><strong>⚡ 零延迟。</strong> &lt;1ms 额外开销，流式响应实时到达。</p>
+      </div>
+
+      <div class="url-box" id="proxy-url-box">{{ proxy_url }}</div>
+      <div style="text-align:center; margin-bottom: 16px;">
+        <button class="copy-btn" onclick="navigator.clipboard.writeText('{{ proxy_url }}').then(()=>this.textContent='已复制!')">📋 复制地址</button>
+      </div>
+
+      <p style="text-align:center; font-size:13px; color:var(--muted); margin-bottom: 24px;">
+        替换 <code>OPENAI_BASE_URL</code> 为上述地址，或修改 SDK 中的 <code>base_url</code>。
+      </p>
+
+      <div class="btn-row" style="justify-content:center;">
+        <a href="/" class="btn btn-primary">打开仪表板 →</a>
+      </div>
+
+      {% else if step == 2 %}
+      <!-- ─── Step 2: 完成 ─── -->
+      <div class="done-icon">✅</div>
+      <h2 class="step-title" style="text-align:center;">配置完成！</h2>
+      <p class="step-subtitle" style="text-align:center;">
+        开始使用你的应用，每次 API 调用都会实时显示在这里。
+      </p>
+      <div class="url-box" id="proxy-url-box">{{ proxy_url }}</div>
+      <div style="text-align:center; margin-bottom:24px;">
+        <button class="copy-btn" onclick="navigator.clipboard.writeText('{{ proxy_url }}').then(()=>this.textContent='已复制!')">📋 复制地址</button>
+      </div>
+      <p style="text-align:center; font-size:13px; color:var(--muted); margin-bottom:24px;">
+        兼容所有 OpenAI SDK — Python、Node.js、LangChain 等。
+      </p>
+      <div class="btn-row" style="justify-content:center;">
+        <a href="/" class="btn btn-primary">打开仪表板 →</a>
+      </div>
+
+      {{ chat_widget|safe }}
+      {% endif %}
+    </div>
+  </div>
+</div>
+<div class="footer">TokenWise Core {{ version }} · 数据仅存储在本地 · 不外传任何信息</div>
+<style>.footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px; }</style>
+</body>
+</html>

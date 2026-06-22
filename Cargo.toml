@@ -1,6 +1,6 @@
 [package]
 name = "tokenwise"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2024"
 description = "A Rust transparent proxy that saves 70-90% on AI API costs"
 license = "MIT"
@@ -9,6 +9,13 @@ repository = "https://github.com/chentang1127-hub/tokenwise"
 [[bin]]
 name = "tokenwise"
 path = "src/main.rs"
+
+[features]
+# gRPC proxy support (currently type definitions only; server impl planned for v0.4.0)
+grpc = ["tonic", "prost"]
+
+[dev-dependencies]
+tower = "0.5"
 
 [dependencies]
 # Async runtime
@@ -20,10 +27,9 @@ http-body = "1"
 http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["full"] }
 axum = "0.8"
-tower = "0.5"
 
 # HTTP client for upstream calls
-reqwest = { version = "0.12", features = ["stream", "json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.12", features = ["stream", "json", "rustls-tls", "blocking"], default-features = false }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -51,6 +57,9 @@ sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
 base64 = "0.22"
-once_cell = "1"
-parking_lot = "0.12"
 futures-util = "0.3"
+open = "5"
+
+# gRPC (optional — enable with --features grpc)
+tonic = { version = "0.12", optional = true }
+prost = { version = "0.13", optional = true }

@@ -1,7 +1,23 @@
-/target
+# Build output
+target/
 *.db
 *.db-wal
 *.db-shm
-.git
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dev
+.tokenwise_setup_done
+data/
 .env
-README.md
+
+# Docs
+*.md

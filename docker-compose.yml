@@ -1,0 +1,62 @@
+# TokenWise Core — Production deployment with automatic Let's Encrypt TLS
+#
+# Quickstart:
+#   1. Set your domains in .env (see .env.example)
+#   2. Edit config.yaml with your API provider keys
+#   3. docker compose up -d
+#
+# Dashboard: https://dashboard.yourdomain.com
+# Proxy:     https://proxy.yourdomain.com/v1
+#
+# Without a domain (local dev):
+#   Dashboard: http://localhost:9400
+#   Proxy:     http://localhost:9401
+
+services:
+  tokenwise:
+    build: .
+    container_name: tokenwise-core
+    restart: unless-stopped
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - tokenwise_data:/app
+    environment:
+      - TW_HEADLESS=true
+      - RUST_LOG=${RUST_LOG:-info,tokenwise=debug}
+    expose:
+      - "9400"
+      - "9401"
+    # For local dev without Caddy, uncomment ports and comment out caddy service:
+    # ports:
+    #   - "9400:9400"
+    #   - "9401:9401"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9400/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ── Auto-TLS reverse proxy (Caddy) ─────────────────────────
+  # Comment out this entire service for local dev without a domain.
+  caddy:
+    image: caddy:2-alpine
+    container_name: tokenwise-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - tokenwise
+    environment:
+      - CADDY_DASHBOARD_DOMAIN=${CADDY_DASHBOARD_DOMAIN:-:80}
+      - CADDY_PROXY_DOMAIN=${CADDY_PROXY_DOMAIN:-:80}
+
+volumes:
+  tokenwise_data:
+  caddy_data:
+  caddy_config:
