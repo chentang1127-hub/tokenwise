@@ -52,7 +52,8 @@ impl Metrics {
 
     /// Add token counts.
     pub fn add_tokens(&self, prompt: u64, completion: u64) {
-        self.prompt_tokens_total.fetch_add(prompt, Ordering::Relaxed);
+        self.prompt_tokens_total
+            .fetch_add(prompt, Ordering::Relaxed);
         self.completion_tokens_total
             .fetch_add(completion, Ordering::Relaxed);
     }

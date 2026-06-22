@@ -127,10 +127,7 @@ pub fn import_from_directory(
             };
 
             // Deduplicate by message ID
-            let msg_id = message
-                .get("id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let msg_id = message.get("id").and_then(|v| v.as_str()).unwrap_or("");
 
             if msg_id.is_empty() || !seen_message_ids.insert(msg_id.to_string()) {
                 continue; // Already seen this message
@@ -143,13 +140,9 @@ pub fn import_from_directory(
                 .unwrap_or("deepseek-v4-pro")
                 .to_string();
 
-            let timestamp_str = json
-                .get("timestamp")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let timestamp = parse_timestamp(timestamp_str).unwrap_or_else(|| {
-                chrono::Utc::now().timestamp()
-            });
+            let timestamp_str = json.get("timestamp").and_then(|v| v.as_str()).unwrap_or("");
+            let timestamp =
+                parse_timestamp(timestamp_str).unwrap_or_else(|| chrono::Utc::now().timestamp());
 
             let input_tokens = usage
                 .get("input_tokens")
@@ -215,9 +208,7 @@ pub fn import_from_directory(
 
     info!(
         "Import complete: {} calls ({:.4} USD total) from {} files",
-        result.records_inserted,
-        result.total_cost,
-        result.files_scanned
+        result.records_inserted, result.total_cost, result.files_scanned
     );
 
     Ok(result)
@@ -265,7 +256,10 @@ mod tests {
     #[test]
     fn test_infer_provider() {
         assert_eq!(infer_provider_from_model("deepseek-v4-pro").0, "deepseek");
-        assert_eq!(infer_provider_from_model("claude-sonnet-4-6").0, "anthropic");
+        assert_eq!(
+            infer_provider_from_model("claude-sonnet-4-6").0,
+            "anthropic"
+        );
         assert_eq!(infer_provider_from_model("gpt-4.1").0, "openai");
         assert_eq!(infer_provider_from_model("gemini-2.5-flash").0, "google");
         assert_eq!(infer_provider_from_model("unknown-model").0, "deepseek");

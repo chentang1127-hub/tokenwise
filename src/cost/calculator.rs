@@ -42,5 +42,4 @@ mod tests {
         let cost = compute_cost(1000, 1000, &m);
         assert!((cost - 0.00137).abs() < 0.00001);
     }
-
 }

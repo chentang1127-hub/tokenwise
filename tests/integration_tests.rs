@@ -5,9 +5,9 @@
 //!
 //! Run with: `cargo test --test integration_tests`
 
-use std::sync::Arc;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
+use std::sync::Arc;
 use tower::util::ServiceExt;
 
 // ── Helpers ──────────────────────────────────────────────
@@ -21,27 +21,25 @@ fn test_config() -> tokenwise::config::Config {
             admin: "127.0.0.1:9400".to_string(),
             timeout_secs: 10,
         },
-        providers: vec![
-            tokenwise::config::ProviderConfig {
-                name: "deepseek".into(),
-                base_url: "https://api.deepseek.com/v1".into(),
-                api_key_env: "DEEPSEEK_API_KEY".into(),
-                models: vec![
-                    tokenwise::config::ModelConfig {
-                        id: "deepseek-chat".into(),
-                        tier: "cheap".into(),
-                        cost_per_1k_prompt: 0.00027,
-                        cost_per_1k_completion: 0.0011,
-                    },
-                    tokenwise::config::ModelConfig {
-                        id: "deepseek-reasoner".into(),
-                        tier: "premium".into(),
-                        cost_per_1k_prompt: 0.00055,
-                        cost_per_1k_completion: 0.00219,
-                    },
-                ],
-            },
-        ],
+        providers: vec![tokenwise::config::ProviderConfig {
+            name: "deepseek".into(),
+            base_url: "https://api.deepseek.com/v1".into(),
+            api_key_env: "DEEPSEEK_API_KEY".into(),
+            models: vec![
+                tokenwise::config::ModelConfig {
+                    id: "deepseek-chat".into(),
+                    tier: "cheap".into(),
+                    cost_per_1k_prompt: 0.00027,
+                    cost_per_1k_completion: 0.0011,
+                },
+                tokenwise::config::ModelConfig {
+                    id: "deepseek-reasoner".into(),
+                    tier: "premium".into(),
+                    cost_per_1k_prompt: 0.00055,
+                    cost_per_1k_completion: 0.00219,
+                },
+            ],
+        }],
         routing: tokenwise::config::RoutingConfig {
             simple_max_tokens: 300,
             complex_min_tokens: 1500,
@@ -62,9 +60,7 @@ fn test_config() -> tokenwise::config::Config {
             fallback_on_empty_response: true,
             fallback_on_truncated: true,
         },
-        license: tokenwise::config::LicenseConfig {
-            key: String::new(),
-        },
+        license: tokenwise::config::LicenseConfig { key: String::new() },
         storage: tokenwise::config::StorageConfig {
             db_path: ":memory:".to_string(),
             retention_days: 90,
@@ -106,7 +102,12 @@ async fn body_string(body: axum::body::Body) -> String {
 async fn test_health_endpoint() {
     let app = build_test_app();
     let resp = app
-        .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -125,7 +126,12 @@ async fn test_dashboard_returns_html() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let content_type = resp.headers().get("content-type").unwrap().to_str().unwrap();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
     assert!(content_type.contains("text/html"));
     let body = body_string(resp.into_body()).await;
     assert!(body.contains("TokenWise Core"));
@@ -135,7 +141,12 @@ async fn test_dashboard_returns_html() {
 async fn test_dashboard_cn_locale() {
     let app = build_test_app();
     let resp = app
-        .oneshot(Request::builder().uri("/?lang=zh").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/?lang=zh")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -245,7 +256,12 @@ async fn test_budget_status_api() {
 async fn test_calls_page() {
     let app = build_test_app();
     let resp = app
-        .oneshot(Request::builder().uri("/calls").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/calls")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -272,7 +288,12 @@ async fn test_calls_page_with_filters() {
 async fn test_savings_page() {
     let app = build_test_app();
     let resp = app
-        .oneshot(Request::builder().uri("/savings").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/savings")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -284,7 +305,12 @@ async fn test_savings_page() {
 async fn test_metrics_endpoint() {
     let app = build_test_app();
     let resp = app
-        .oneshot(Request::builder().uri("/metrics").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/metrics")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -299,7 +325,12 @@ async fn test_metrics_endpoint() {
 async fn test_setup_page() {
     let app = build_test_app();
     let resp = app
-        .oneshot(Request::builder().uri("/setup").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/setup")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -311,11 +342,21 @@ async fn test_setup_page() {
 async fn test_404_fallback_returns_html() {
     let app = build_test_app();
     let resp = app
-        .oneshot(Request::builder().uri("/no-such-page").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/no-such-page")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-    let content_type = resp.headers().get("content-type").unwrap().to_str().unwrap();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
     assert!(content_type.contains("text/html"));
     let body = body_string(resp.into_body()).await;
     assert!(body.contains("404"));
@@ -326,7 +367,12 @@ async fn test_404_fallback_returns_html() {
 async fn test_404_fallback_cn_locale() {
     let app = build_test_app();
     let resp = app
-        .oneshot(Request::builder().uri("/no-such-page?lang=zh").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/no-such-page?lang=zh")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);

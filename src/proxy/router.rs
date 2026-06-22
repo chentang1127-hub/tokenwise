@@ -69,7 +69,12 @@ pub fn route_within_provider(
 
     info!(
         "📌 Routed [{}] within {} → {}/{} (${:.6}/1K prompt, ${:.6}/1K completion)",
-        tier_name, provider_name, provider.name, model.id, model.cost_per_1k_prompt, model.cost_per_1k_completion,
+        tier_name,
+        provider_name,
+        provider.name,
+        model.id,
+        model.cost_per_1k_prompt,
+        model.cost_per_1k_completion,
     );
 
     Some(Route {
@@ -132,7 +137,9 @@ pub fn fallback_route_within_provider(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{BudgetConfig, Config, ModelConfig, ProviderConfig, RoutingConfig, SafetyNetConfig};
+    use crate::config::{
+        BudgetConfig, Config, ModelConfig, ProviderConfig, RoutingConfig, SafetyNetConfig,
+    };
     use std::collections::HashMap;
 
     fn test_config() -> Config {

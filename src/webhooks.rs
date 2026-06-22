@@ -50,7 +50,7 @@ impl Default for WebhookConfig {
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum WebhookEvent {
     BudgetWarning {
-        scope: String,       // "daily" or "monthly"
+        scope: String, // "daily" or "monthly"
         spent: f64,
         limit: f64,
         pct: f64,

@@ -115,15 +115,14 @@ async fn main() {
             );
         }
         Command::Keygen { days } => {
+            use base64::Engine;
             use hmac::{Hmac, Mac};
             use sha2::Sha256;
-            use base64::Engine;
 
             const SECRET: &[u8] = &[
-                0x7f, 0xa2, 0xd1, 0x3e, 0x8b, 0x55, 0x91, 0xc4,
-                0xf0, 0x6d, 0x2a, 0x79, 0x0e, 0xb8, 0x33, 0x5c,
-                0xa1, 0x94, 0xe7, 0x2f, 0x46, 0xd8, 0x0b, 0xc6,
-                0x1a, 0x3d, 0x57, 0x9f, 0xe2, 0x04, 0x68, 0xcd,
+                0x7f, 0xa2, 0xd1, 0x3e, 0x8b, 0x55, 0x91, 0xc4, 0xf0, 0x6d, 0x2a, 0x79, 0x0e, 0xb8,
+                0x33, 0x5c, 0xa1, 0x94, 0xe7, 0x2f, 0x46, 0xd8, 0x0b, 0xc6, 0x1a, 0x3d, 0x57, 0x9f,
+                0xe2, 0x04, 0x68, 0xcd,
             ];
 
             let now = std::time::SystemTime::now()
@@ -140,17 +139,22 @@ async fn main() {
             payload.extend_from_slice(&signature);
             let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&payload);
             println!("tw_pro_{}", encoded);
-            println!("Expires: {} ({} days from now)", {
-                let dt = chrono::DateTime::from_timestamp(expires_at as i64, 0);
-                dt.map(|d| d.format("%Y-%m-%d").to_string()).unwrap_or_default()
-            }, days);
+            println!(
+                "Expires: {} ({} days from now)",
+                {
+                    let dt = chrono::DateTime::from_timestamp(expires_at as i64, 0);
+                    dt.map(|d| d.format("%Y-%m-%d").to_string())
+                        .unwrap_or_default()
+                },
+                days
+            );
         }
         Command::Backup { output } => {
             info!("Backing up database from: {}", cfg.storage.db_path);
 
             // Open the store (this runs WAL checkpoint on open)
-            let store = recording::Store::new(&cfg.storage.db_path)
-                .expect("Failed to open SQLite store");
+            let store =
+                recording::Store::new(&cfg.storage.db_path).expect("Failed to open SQLite store");
             store.checkpoint();
 
             // Build output filename with timestamp
@@ -166,19 +170,17 @@ async fn main() {
 
             // Create output directory if needed
             if let Some(parent) = output_path.parent() {
-                std::fs::create_dir_all(parent)
-                    .unwrap_or_else(|e| {
-                        error!("Failed to create output directory: {e}");
-                        std::process::exit(1);
-                    });
+                std::fs::create_dir_all(parent).unwrap_or_else(|e| {
+                    error!("Failed to create output directory: {e}");
+                    std::process::exit(1);
+                });
             }
 
             // Copy the database file
-            std::fs::copy(&cfg.storage.db_path, &output_path)
-                .unwrap_or_else(|e| {
-                    error!("Failed to copy database: {e}");
-                    std::process::exit(1);
-                });
+            std::fs::copy(&cfg.storage.db_path, &output_path).unwrap_or_else(|e| {
+                error!("Failed to copy database: {e}");
+                std::process::exit(1);
+            });
 
             let size = std::fs::metadata(&output_path)
                 .map(|m| m.len())
@@ -204,12 +206,36 @@ async fn main() {
             let admin_url = format!("http://127.0.0.1:{}/health", admin_port);
             let proxy_url = format!("http://127.0.0.1:{}/health", proxy_port);
 
-            let admin_ok = client.get(&admin_url).send().map(|r| r.status().is_success()).unwrap_or(false);
-            let proxy_ok = client.get(&proxy_url).send().map(|r| r.status().is_success()).unwrap_or(false);
+            let admin_ok = client
+                .get(&admin_url)
+                .send()
+                .map(|r| r.status().is_success())
+                .unwrap_or(false);
+            let proxy_ok = client
+                .get(&proxy_url)
+                .send()
+                .map(|r| r.status().is_success())
+                .unwrap_or(false);
 
             println!("TokenWise Core v{}", env!("CARGO_PKG_VERSION"));
-            println!("  Admin Dashboard ({}):  {}", cfg.proxy.admin, if admin_ok { "✅ running" } else { "❌ not reachable" });
-            println!("  Proxy           ({}):  {}", cfg.proxy.listen, if proxy_ok { "✅ running" } else { "❌ not reachable" });
+            println!(
+                "  Admin Dashboard ({}):  {}",
+                cfg.proxy.admin,
+                if admin_ok {
+                    "✅ running"
+                } else {
+                    "❌ not reachable"
+                }
+            );
+            println!(
+                "  Proxy           ({}):  {}",
+                cfg.proxy.listen,
+                if proxy_ok {
+                    "✅ running"
+                } else {
+                    "❌ not reachable"
+                }
+            );
             println!("  Database:               {}", cfg.storage.db_path);
             if std::path::Path::new(&cfg.storage.db_path).exists() {
                 let meta = std::fs::metadata(&cfg.storage.db_path).unwrap();
@@ -332,7 +358,13 @@ async fn main() {
             let webhook = WebhookDispatcher::new(cfg.webhook.clone())
                 .map(|d| Arc::new(tokio::sync::Mutex::new(d)));
 
-            let proxy_service = proxy::build_service(cfg, store.clone(), routing_enabled, metrics.clone(), webhook);
+            let proxy_service = proxy::build_service(
+                cfg,
+                store.clone(),
+                routing_enabled,
+                metrics.clone(),
+                webhook,
+            );
 
             // Graceful shutdown: checkpoint WAL on Ctrl+C
             let shutdown_store = store.clone();

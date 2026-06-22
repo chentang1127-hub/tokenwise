@@ -23,11 +23,12 @@ use tracing::{debug, error, info, warn};
 use crate::admin::Metrics;
 use crate::config::Config;
 use crate::proxy::anthropic_format::{
-    AnthropicSseState, AnthropicSseStream, anthropic_to_openai,
-    openai_to_anthropic,
+    AnthropicSseState, AnthropicSseStream, anthropic_to_openai, openai_to_anthropic,
 };
 use crate::proxy::classifier::classify;
-use crate::proxy::router::{fallback_route, fallback_route_within_provider, route, route_within_provider};
+use crate::proxy::router::{
+    fallback_route, fallback_route_within_provider, route, route_within_provider,
+};
 use crate::proxy::tee_stream::spawn_analyzer;
 use crate::recording::{CallRecord, Store};
 use crate::webhooks::WebhookDispatcher;
@@ -129,7 +130,9 @@ impl ProxyService {
         //   /v1/messages                  → smart routing
         //   /v1/{provider}/messages       → force provider
         let path = req.uri().path().to_string();
-        let (force_provider, is_anthropic): (Option<String>, bool) = if path == "/v1/chat/completions" {
+        let (force_provider, is_anthropic): (Option<String>, bool) = if path
+            == "/v1/chat/completions"
+        {
             (None, false)
         } else if path == "/v1/messages" {
             (None, true)
@@ -141,8 +144,15 @@ impl ProxyService {
             if middle.is_empty() || !self.cfg.providers.iter().any(|p| p.name == middle) {
                 return Ok(Self::error_response(
                     StatusCode::NOT_FOUND,
-                    &format!("Unknown provider '{middle}'. Available: {}",
-                        self.cfg.providers.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")),
+                    &format!(
+                        "Unknown provider '{middle}'. Available: {}",
+                        self.cfg
+                            .providers
+                            .iter()
+                            .map(|p| p.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
                 ));
             }
             (Some(middle.to_string()), false)
@@ -154,8 +164,15 @@ impl ProxyService {
             if middle.is_empty() || !self.cfg.providers.iter().any(|p| p.name == middle) {
                 return Ok(Self::error_response(
                     StatusCode::NOT_FOUND,
-                    &format!("Unknown provider '{middle}'. Available: {}",
-                        self.cfg.providers.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")),
+                    &format!(
+                        "Unknown provider '{middle}'. Available: {}",
+                        self.cfg
+                            .providers
+                            .iter()
+                            .map(|p| p.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
                 ));
             }
             (Some(middle.to_string()), true)
@@ -170,12 +187,20 @@ impl ProxyService {
         if self.cfg.budget.daily_limit_usd > 0.0 || self.cfg.budget.monthly_limit_usd > 0.0 {
             let now = chrono::Utc::now();
             if self.cfg.budget.daily_limit_usd > 0.0 {
-                let today_start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
+                let today_start = now
+                    .date_naive()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .and_utc()
+                    .timestamp();
                 let spent_today = self.store.total_cost_since(today_start);
                 if spent_today >= self.cfg.budget.daily_limit_usd {
                     return Ok(Self::error_response(
                         StatusCode::TOO_MANY_REQUESTS,
-                        &format!("Daily budget exceeded: ${:.4} / ${:.2}", spent_today, self.cfg.budget.daily_limit_usd),
+                        &format!(
+                            "Daily budget exceeded: ${:.4} / ${:.2}",
+                            spent_today, self.cfg.budget.daily_limit_usd
+                        ),
                     ));
                 }
             }
@@ -191,7 +216,10 @@ impl ProxyService {
                 if spent_month >= self.cfg.budget.monthly_limit_usd {
                     return Ok(Self::error_response(
                         StatusCode::TOO_MANY_REQUESTS,
-                        &format!("Monthly budget exceeded: ${:.4} / ${:.2}", spent_month, self.cfg.budget.monthly_limit_usd),
+                        &format!(
+                            "Monthly budget exceeded: ${:.4} / ${:.2}",
+                            spent_month, self.cfg.budget.monthly_limit_usd
+                        ),
                     ));
                 }
             }
@@ -282,7 +310,8 @@ impl ProxyService {
         let (actual_route, routed_model_id, was_routed) = {
             // Use the first model from the first provider as fallback,
             // rather than a hardcoded model name that may not be in config.
-            let default_model = self.cfg
+            let default_model = self
+                .cfg
                 .providers
                 .first()
                 .and_then(|p| p.models.first())
@@ -299,7 +328,10 @@ impl ProxyService {
                 let provider_route = crate::proxy::router::Route {
                     provider: fp.clone(),
                     model: original_model.to_string(),
-                    base_url: self.cfg.providers.iter()
+                    base_url: self
+                        .cfg
+                        .providers
+                        .iter()
                         .find(|p| p.name == *fp)
                         .map(|p| p.base_url.clone())
                         .unwrap_or(route.base_url),
@@ -409,8 +441,9 @@ impl ProxyService {
             serde_json::to_vec(&upstream_json).unwrap_or_else(|_| body_bytes.to_vec());
 
         // Make upstream request (with optional fallback)
-        let (response, actual_route, fallback_used) =
-            self.try_upstream(&upstream_body, &actual_route, client_auth.as_deref()).await;
+        let (response, actual_route, fallback_used) = self
+            .try_upstream(&upstream_body, &actual_route, client_auth.as_deref())
+            .await;
 
         let latency_ms = start.elapsed().as_millis() as u64;
 
@@ -443,13 +476,11 @@ impl ProxyService {
                 let msg_id = format!("msg_{}", uuid::Uuid::new_v4());
                 let display_model = anthropic_model.as_deref().unwrap_or(&routed_model_id);
 
-                let sse_state = AnthropicSseState::new(
-                    msg_id.clone(),
-                    display_model.to_string(),
-                    0u32,
-                );
+                let sse_state =
+                    AnthropicSseState::new(msg_id.clone(), display_model.to_string(), 0u32);
                 let upstream_stream = upstream_response.bytes_stream();
-                let (anthropic_stream, shared_state) = AnthropicSseStream::new(upstream_stream, sse_state);
+                let (anthropic_stream, shared_state) =
+                    AnthropicSseStream::new(upstream_stream, sse_state);
 
                 // Convert to http_body Body
                 let body_stream = anthropic_stream.map(|result| {
@@ -498,8 +529,14 @@ impl ProxyService {
                         let pt = if s.input_tokens > 0 {
                             s.input_tokens
                         } else {
-                            serde_json::to_string(&request_json_clone.get("messages").unwrap_or(&serde_json::json!([])))
-                                .unwrap_or_default().len() as u32 / 4
+                            serde_json::to_string(
+                                &request_json_clone
+                                    .get("messages")
+                                    .unwrap_or(&serde_json::json!([])),
+                            )
+                            .unwrap_or_default()
+                            .len() as u32
+                                / 4
                         };
                         let ct = s.output_tokens;
                         let empty = s.content.is_empty();
@@ -522,8 +559,11 @@ impl ProxyService {
                     rec.tenant_id = tenant_for_spawn;
 
                     if let Some(model_cfg) = cfg.model_config(&provider, &model) {
-                        rec.cost_usd =
-                            crate::cost::calculator::compute_cost(prompt_tokens, completion_tokens, model_cfg);
+                        rec.cost_usd = crate::cost::calculator::compute_cost(
+                            prompt_tokens,
+                            completion_tokens,
+                            model_cfg,
+                        );
                     }
 
                     stream_metrics.add_tokens(prompt_tokens as u64, completion_tokens as u64);
@@ -554,20 +594,37 @@ impl ProxyService {
                         let now_ts = chrono::Utc::now().timestamp();
                         let spent_today = if budget_anthro.daily_limit_usd > 0.0 {
                             let today_start = chrono::Utc::now()
-                                .date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
+                                .date_naive()
+                                .and_hms_opt(0, 0, 0)
+                                .unwrap()
+                                .and_utc()
+                                .timestamp();
                             store.total_cost_since(today_start)
-                        } else { 0.0 };
+                        } else {
+                            0.0
+                        };
                         let spent_month = if budget_anthro.monthly_limit_usd > 0.0 {
                             let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
                             let ms_ts = chrono::NaiveDate::parse_from_str(&month_start, "%Y-%m-%d")
-                                .unwrap().and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
+                                .unwrap()
+                                .and_hms_opt(0, 0, 0)
+                                .unwrap()
+                                .and_utc()
+                                .timestamp();
                             store.total_cost_since(ms_ts)
-                        } else { 0.0 };
+                        } else {
+                            0.0
+                        };
                         let mut dispatcher = wh.lock().await;
-                        dispatcher.check_budget(
-                            spent_today, budget_anthro.daily_limit_usd,
-                            spent_month, budget_anthro.monthly_limit_usd, now_ts,
-                        ).await;
+                        dispatcher
+                            .check_budget(
+                                spent_today,
+                                budget_anthro.daily_limit_usd,
+                                spent_month,
+                                budget_anthro.monthly_limit_usd,
+                                now_ts,
+                            )
+                            .await;
                     }
                 });
 
@@ -589,7 +646,8 @@ impl ProxyService {
                 // Convert TeeStream into an http_body Body by mapping items to frames
                 let body_stream = tee.map(|result| {
                     result.map(http_body::Frame::data).map_err(|s| {
-                        Box::new(std::io::Error::other(s)) as Box<dyn std::error::Error + Send + Sync>
+                        Box::new(std::io::Error::other(s))
+                            as Box<dyn std::error::Error + Send + Sync>
                     })
                 });
                 let stream_body = StreamBody::new(body_stream);
@@ -675,20 +733,37 @@ impl ProxyService {
                         let now_ts = chrono::Utc::now().timestamp();
                         let spent_today = if budget_openai.daily_limit_usd > 0.0 {
                             let today_start = chrono::Utc::now()
-                                .date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
+                                .date_naive()
+                                .and_hms_opt(0, 0, 0)
+                                .unwrap()
+                                .and_utc()
+                                .timestamp();
                             store.total_cost_since(today_start)
-                        } else { 0.0 };
+                        } else {
+                            0.0
+                        };
                         let spent_month = if budget_openai.monthly_limit_usd > 0.0 {
                             let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
                             let ms_ts = chrono::NaiveDate::parse_from_str(&month_start, "%Y-%m-%d")
-                                .unwrap().and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
+                                .unwrap()
+                                .and_hms_opt(0, 0, 0)
+                                .unwrap()
+                                .and_utc()
+                                .timestamp();
                             store.total_cost_since(ms_ts)
-                        } else { 0.0 };
+                        } else {
+                            0.0
+                        };
                         let mut dispatcher = wh.lock().await;
-                        dispatcher.check_budget(
-                            spent_today, budget_openai.daily_limit_usd,
-                            spent_month, budget_openai.monthly_limit_usd, now_ts,
-                        ).await;
+                        dispatcher
+                            .check_budget(
+                                spent_today,
+                                budget_openai.daily_limit_usd,
+                                spent_month,
+                                budget_openai.monthly_limit_usd,
+                                now_ts,
+                            )
+                            .await;
                     }
                 });
 
@@ -720,26 +795,32 @@ impl ProxyService {
                         actual_route_ns.model
                     );
                     let fb_opt = fallback_route_within_provider(
-                        &actual_route_ns.tier, &self.cfg, &actual_route_ns.provider,
+                        &actual_route_ns.tier,
+                        &self.cfg,
+                        &actual_route_ns.provider,
                     )
                     .or_else(|| fallback_route(&actual_route_ns.tier, &self.cfg));
                     if let Some(fb_route) = fb_opt {
                         let fb_start = Instant::now();
-                        match self.try_upstream(&upstream_body, &fb_route, client_auth.as_deref()).await {
-                            (Ok(fb_resp), fb_route_ret, _) => {
-                                match fb_resp.bytes().await {
-                                    Ok(fb_bytes) => {
-                                        info!("Safety net fallback to {} succeeded", fb_route_ret.model);
-                                        resp_bytes = fb_bytes;
-                                        actual_route_ns = fb_route_ret;
-                                        fallback_used_ns = true;
-                                        latency_ms_ns += fb_start.elapsed().as_millis() as u64;
-                                    }
-                                    Err(e) => {
-                                        warn!("Safety net fallback body read failed: {e}");
-                                    }
+                        match self
+                            .try_upstream(&upstream_body, &fb_route, client_auth.as_deref())
+                            .await
+                        {
+                            (Ok(fb_resp), fb_route_ret, _) => match fb_resp.bytes().await {
+                                Ok(fb_bytes) => {
+                                    info!(
+                                        "Safety net fallback to {} succeeded",
+                                        fb_route_ret.model
+                                    );
+                                    resp_bytes = fb_bytes;
+                                    actual_route_ns = fb_route_ret;
+                                    fallback_used_ns = true;
+                                    latency_ms_ns += fb_start.elapsed().as_millis() as u64;
                                 }
-                            }
+                                Err(e) => {
+                                    warn!("Safety net fallback body read failed: {e}");
+                                }
+                            },
                             (Err(e), _, _) => {
                                 warn!("Safety net fallback request failed: {e}");
                             }
@@ -831,9 +912,7 @@ impl ProxyService {
 
             // Convert to Anthropic format if the client expects it
             let final_bytes = if is_anthropic {
-                if let Ok(openai_resp) =
-                    serde_json::from_slice::<serde_json::Value>(&resp_bytes)
-                {
+                if let Ok(openai_resp) = serde_json::from_slice::<serde_json::Value>(&resp_bytes) {
                     let display_model = anthropic_model.as_deref().unwrap_or(&routed_model_id);
                     let anthropic_resp = openai_to_anthropic(&openai_resp, display_model);
                     Bytes::from(serde_json::to_vec(&anthropic_resp).unwrap_or_default())
@@ -934,11 +1013,8 @@ impl ProxyService {
         let req = req_builder.body(body.to_vec());
 
         // Debug: log the actual request
-        let body_preview = std::str::from_utf8(body)
-            .unwrap_or("<binary>");
-        debug!(
-            "Upstream request: POST {url} | auth={auth_header} | body={body_preview}"
-        );
+        let body_preview = std::str::from_utf8(body).unwrap_or("<binary>");
+        debug!("Upstream request: POST {url} | auth={auth_header} | body={body_preview}");
 
         match req.send().await {
             Ok(resp) => {
@@ -962,13 +1038,17 @@ impl ProxyService {
 
                     // Use provider-constrained fallback so the client's API key
                     // stays within its own provider (zero-trust compatible).
-                    let fb_opt = fallback_route_within_provider(&route.tier, &self.cfg, &route.provider)
-                        .or_else(|| {
-                            // If no fallback within the same provider, try global
-                            // fallback as last resort (works when TokenWise has its own keys).
-                            debug!("No within-provider fallback for {}, trying global", route.provider);
-                            fallback_route(&route.tier, &self.cfg)
-                        });
+                    let fb_opt =
+                        fallback_route_within_provider(&route.tier, &self.cfg, &route.provider)
+                            .or_else(|| {
+                                // If no fallback within the same provider, try global
+                                // fallback as last resort (works when TokenWise has its own keys).
+                                debug!(
+                                    "No within-provider fallback for {}, trying global",
+                                    route.provider
+                                );
+                                fallback_route(&route.tier, &self.cfg)
+                            });
                     if let Some(fb_route) = fb_opt {
                         let fb_url = format!("{}/chat/completions", fb_route.base_url);
                         let fb_effective = if fb_route.api_key.is_empty() {
@@ -1043,8 +1123,7 @@ impl ProxyService {
                         .post(&fb_url)
                         .header("Content-Type", "application/json");
                     if !fb_auth_header2.is_empty() {
-                        fb_req_builder2 =
-                            fb_req_builder2.header("Authorization", &fb_auth_header2);
+                        fb_req_builder2 = fb_req_builder2.header("Authorization", &fb_auth_header2);
                     }
                     let fb_req = fb_req_builder2.body(body.to_vec());
 

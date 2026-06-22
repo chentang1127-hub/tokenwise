@@ -217,7 +217,12 @@ mod tests {
     fn test_semantic_cache_basic() {
         let mut cache = SemanticCache::new(100, 0.8, 24);
         let now = 1000;
-        cache.put("summarize this article about AI", r#"{"response":"ok"}"#, "test-model", now);
+        cache.put(
+            "summarize this article about AI",
+            r#"{"response":"ok"}"#,
+            "test-model",
+            now,
+        );
 
         // Exact same prompt should match
         let result = cache.get("summarize this article about AI", now);
@@ -236,7 +241,12 @@ mod tests {
     fn test_semantic_cache_ttl() {
         let mut cache = SemanticCache::new(100, 0.8, 24);
         let now = 1000;
-        cache.put("summarize this article", r#"{"response":"ok"}"#, "test-model", now);
+        cache.put(
+            "summarize this article",
+            r#"{"response":"ok"}"#,
+            "test-model",
+            now,
+        );
 
         // Within TTL
         assert!(cache.get("summarize this article", now + 100).is_some());

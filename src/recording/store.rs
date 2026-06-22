@@ -265,7 +265,9 @@ impl Store {
         tenant_id: Option<&str>,
     ) -> Result<Vec<CallRecord>, Box<dyn std::error::Error>> {
         let conn = self.conn.lock().unwrap();
-        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(tid) = tenant_id {
+        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(tid) =
+            tenant_id
+        {
             (
                 "SELECT id, timestamp, model, provider, complexity, prompt_tokens, completion_tokens, cost_usd, latency_ms, fallback_used, prompt_hash, finish_reason, was_routed, recommended_model, estimated_optimal_cost, tenant_id
                  FROM calls WHERE tenant_id = ?1 ORDER BY timestamp DESC LIMIT ?2".to_string(),
@@ -278,7 +280,8 @@ impl Store {
                 vec![Box::new(limit as i64)],
             )
         };
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
         let mut stmt = conn.prepare(&sql)?;
 
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
@@ -361,7 +364,8 @@ impl Store {
                 "SELECT COUNT(DISTINCT model) FROM calls WHERE date(timestamp, 'unixepoch') >= ?1",
                 rusqlite::params![month_start],
                 |row| row.get(0),
-            ).unwrap_or(0)
+            )
+            .unwrap_or(0)
         }
     }
 
@@ -413,7 +417,8 @@ impl Store {
         params.push(Box::new(limit as i64));
         params.push(Box::new(offset as i64));
 
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
             Ok(CallRecord {
@@ -480,7 +485,8 @@ impl Store {
         }
 
         let sql = format!("{base}{conditions}");
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
         let count: i64 = conn.query_row(&sql, param_refs.as_slice(), |row| row.get(0))?;
         Ok(count)
     }
@@ -527,10 +533,15 @@ impl Store {
     }
 
     /// Token distribution by model for the current month (for charts).
-    pub fn token_distribution(&self, tenant_id: Option<&str>) -> Result<Vec<ModelTokenStats>, Box<dyn std::error::Error>> {
+    pub fn token_distribution(
+        &self,
+        tenant_id: Option<&str>,
+    ) -> Result<Vec<ModelTokenStats>, Box<dyn std::error::Error>> {
         let conn = self.conn.lock().unwrap();
         let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
-        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(tid) = tenant_id {
+        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(tid) =
+            tenant_id
+        {
             (
                 "SELECT model, COUNT(*), COALESCE(SUM(prompt_tokens),0), COALESCE(SUM(completion_tokens),0), COALESCE(SUM(cost_usd),0.0)
                  FROM calls WHERE date(timestamp, 'unixepoch') >= ?1 AND tenant_id = ?2
@@ -545,7 +556,8 @@ impl Store {
                 vec![Box::new(month_start)],
             )
         };
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
         let mut stmt = conn.prepare(&sql)?;
 
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
@@ -573,11 +585,16 @@ impl Store {
     }
 
     /// Get aggregate stats for the current month.
-    pub fn monthly_stats(&self, tenant_id: Option<&str>) -> Result<MonthlyStats, Box<dyn std::error::Error>> {
+    pub fn monthly_stats(
+        &self,
+        tenant_id: Option<&str>,
+    ) -> Result<MonthlyStats, Box<dyn std::error::Error>> {
         let conn = self.conn.lock().unwrap();
         let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
 
-        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(tid) = tenant_id {
+        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(tid) =
+            tenant_id
+        {
             (
                 "SELECT COUNT(*), COALESCE(SUM(prompt_tokens), 0), COALESCE(SUM(completion_tokens), 0), COALESCE(SUM(cost_usd), 0.0), COALESCE(AVG(latency_ms), 0),
                         COALESCE(SUM(CASE WHEN was_routed = 0 AND estimated_optimal_cost IS NOT NULL THEN cost_usd - estimated_optimal_cost ELSE 0 END), 0.0)
@@ -592,19 +609,19 @@ impl Store {
                 vec![Box::new(month_start)],
             )
         };
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
 
         let stats = conn.query_row(&sql, param_refs.as_slice(), |row| {
-                Ok(MonthlyStats {
-                    total_calls: row.get(0)?,
-                    total_prompt_tokens: row.get(1)?,
-                    total_completion_tokens: row.get(2)?,
-                    total_cost: row.get(3)?,
-                    avg_latency_ms: row.get(4)?,
-                    potential_savings: row.get(5)?,
-                })
-            },
-        )?;
+            Ok(MonthlyStats {
+                total_calls: row.get(0)?,
+                total_prompt_tokens: row.get(1)?,
+                total_completion_tokens: row.get(2)?,
+                total_cost: row.get(3)?,
+                avg_latency_ms: row.get(4)?,
+                potential_savings: row.get(5)?,
+            })
+        })?;
 
         Ok(stats)
     }

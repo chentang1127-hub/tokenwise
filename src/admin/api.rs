@@ -3,15 +3,15 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use super::{AppState, chat_widget};
 use askama::Template;
-use serde::Deserialize;
 use axum::{
     Router,
     extract::{Json, Query, State},
     response::{Html, IntoResponse, Redirect},
     routing::{get, post},
 };
-use super::{AppState, chat_widget};
+use serde::Deserialize;
 
 pub fn make_router(state: Arc<AppState>) -> Router {
     Router::new()
@@ -223,14 +223,14 @@ struct CallsPageStats {
 }
 
 struct CallsFilters {
-    range: String,        // current range value
-    complexity: String,   // current complexity filter
-    decision: String,     // current decision filter
-    page: usize,          // current page (1-based)
-    total_pages: usize,   // total pages
+    range: String,      // current range value
+    complexity: String, // current complexity filter
+    decision: String,   // current decision filter
+    page: usize,        // current page (1-based)
+    total_pages: usize, // total pages
     has_prev: bool,
     has_next: bool,
-    range_label: String,  // human-readable label for current range
+    range_label: String, // human-readable label for current range
 }
 
 /// Whether the configured locale is Chinese (from config, fallback).
@@ -287,9 +287,16 @@ async fn dashboard(
             total_hits: 0,
         }
     };
-    let cache_count = cache_stats.total_hits.saturating_sub(cache_stats.total_entries).max(0);
+    let cache_count = cache_stats
+        .total_hits
+        .saturating_sub(cache_stats.total_entries)
+        .max(0);
     let cache_saved = crate::cost::calculator::format_usd(state.store.cache_savings_estimate());
-    let routing_count = if is_pro { state.store.routing_count(tenant_id) } else { 0 };
+    let routing_count = if is_pro {
+        state.store.routing_count(tenant_id)
+    } else {
+        0
+    };
     // Conservative routing savings estimate: each routed call saves ~30% vs
     // the most-expensive model. Real number is the sum of per-call deltas.
     let routing_saved_est = if routing_count > 0 {
@@ -322,13 +329,16 @@ async fn dashboard(
     let month_cost = crate::cost::calculator::format_usd(stats.total_cost);
 
     // Build chart data from token distribution
-    let dist = state.store.token_distribution(tenant_id).unwrap_or_default();
-    let chart_models_json = serde_json::to_string(
-        &dist.iter().map(|m| &m.model).collect::<Vec<_>>()
-    ).unwrap_or_default();
-    let chart_costs_json = serde_json::to_string(
-        &dist.iter().map(|m| m.total_cost).collect::<Vec<_>>()
-    ).unwrap_or_default();
+    let dist = state
+        .store
+        .token_distribution(tenant_id)
+        .unwrap_or_default();
+    let chart_models_json =
+        serde_json::to_string(&dist.iter().map(|m| &m.model).collect::<Vec<_>>())
+            .unwrap_or_default();
+    let chart_costs_json =
+        serde_json::to_string(&dist.iter().map(|m| m.total_cost).collect::<Vec<_>>())
+            .unwrap_or_default();
     let chart_max_cost = dist.iter().map(|m| m.total_cost).fold(0.0f64, f64::max);
 
     let (use_cn, lang_toggle_label, lang_toggle_url) = resolve_lang(&params, &state);
@@ -339,14 +349,21 @@ async fn dashboard(
     let recent_calls: Vec<CallRow> = calls
         .into_iter()
         .map(|c| {
-            let (decision, decision_label) = if c.provider == "demo"
-                || (c.latency_ms < 10 && c.cost_usd == 0.0) {
-                ("eliminated", if use_cn { "已消除" } else { "eliminated" })
-            } else if c.was_routed {
-                ("routed", if use_cn { "已路由 → 更优" } else { "routed → cheaper" })
-            } else {
-                ("direct", if use_cn { "直连" } else { "direct" })
-            };
+            let (decision, decision_label) =
+                if c.provider == "demo" || (c.latency_ms < 10 && c.cost_usd == 0.0) {
+                    ("eliminated", if use_cn { "已消除" } else { "eliminated" })
+                } else if c.was_routed {
+                    (
+                        "routed",
+                        if use_cn {
+                            "已路由 → 更优"
+                        } else {
+                            "routed → cheaper"
+                        },
+                    )
+                } else {
+                    ("direct", if use_cn { "直连" } else { "direct" })
+                };
             let ago_secs = (now - c.timestamp).max(0);
             let ago = if ago_secs < 60 {
                 if use_cn { "刚刚" } else { "just now" }.to_string()
@@ -434,9 +451,16 @@ async fn calls_page(
 
     // Parse filter params
     let range = params.get("range").map(|s| s.as_str()).unwrap_or("all");
-    let complexity = params.get("complexity").map(|s| s.as_str()).unwrap_or("all");
+    let complexity = params
+        .get("complexity")
+        .map(|s| s.as_str())
+        .unwrap_or("all");
     let decision = params.get("decision").map(|s| s.as_str()).unwrap_or("all");
-    let page: usize = params.get("page").and_then(|s| s.parse().ok()).unwrap_or(1).max(1);
+    let page: usize = params
+        .get("page")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1)
+        .max(1);
 
     let range_hours = match range {
         "24h" => Some(24u32),
@@ -445,14 +469,46 @@ async fn calls_page(
         _ => None,
     };
     let range_label = match range {
-        "24h" => if use_cn { "24 小时" } else { "24 Hours" },
-        "7d" => if use_cn { "7 天" } else { "7 Days" },
-        "30d" => if use_cn { "30 天" } else { "30 Days" },
-        _ => if use_cn { "全部" } else { "All Time" },
+        "24h" => {
+            if use_cn {
+                "24 小时"
+            } else {
+                "24 Hours"
+            }
+        }
+        "7d" => {
+            if use_cn {
+                "7 天"
+            } else {
+                "7 Days"
+            }
+        }
+        "30d" => {
+            if use_cn {
+                "30 天"
+            } else {
+                "30 Days"
+            }
+        }
+        _ => {
+            if use_cn {
+                "全部"
+            } else {
+                "All Time"
+            }
+        }
     };
 
-    let complexity_filter = if complexity != "all" { Some(complexity) } else { None };
-    let decision_filter = if decision != "all" { Some(decision) } else { None };
+    let complexity_filter = if complexity != "all" {
+        Some(complexity)
+    } else {
+        None
+    };
+    let decision_filter = if decision != "all" {
+        Some(decision)
+    } else {
+        None
+    };
     let tenant_id = params.get("tenant").map(|s| s.as_str());
 
     let per_page: usize = 50;
@@ -461,7 +517,14 @@ async fn calls_page(
     // Get filtered calls
     let calls = state
         .store
-        .recent_calls_filtered(per_page, offset, range_hours, complexity_filter, decision_filter, tenant_id)
+        .recent_calls_filtered(
+            per_page,
+            offset,
+            range_hours,
+            complexity_filter,
+            decision_filter,
+            tenant_id,
+        )
         .unwrap_or_default();
 
     let total_count = state
@@ -472,15 +535,17 @@ async fn calls_page(
     let total_pages = total_pages.max(1);
 
     // Get summary stats for the filter bar
-    let summary = state.store.calls_summary(range_hours, tenant_id).unwrap_or(crate::recording::store::CallsSummary {
-        total: 0,
-        total_prompt_tokens: 0,
-        total_completion_tokens: 0,
-        total_cost: 0.0,
-        avg_latency_ms: 0.0,
-        eliminated_count: 0,
-        routed_count: 0,
-    });
+    let summary = state.store.calls_summary(range_hours, tenant_id).unwrap_or(
+        crate::recording::store::CallsSummary {
+            total: 0,
+            total_prompt_tokens: 0,
+            total_completion_tokens: 0,
+            total_cost: 0.0,
+            avg_latency_ms: 0.0,
+            eliminated_count: 0,
+            routed_count: 0,
+        },
+    );
 
     let stats = CallsPageStats {
         total_calls: summary.total,
@@ -509,7 +574,14 @@ async fn calls_page(
             let (d, dl) = if c.provider == "demo" || (c.cost_usd == 0.0 && c.latency_ms < 10) {
                 ("eliminated", if use_cn { "已消除" } else { "eliminated" })
             } else if c.was_routed {
-                ("routed", if use_cn { "已路由 → 更优" } else { "routed → cheaper" })
+                (
+                    "routed",
+                    if use_cn {
+                        "已路由 → 更优"
+                    } else {
+                        "routed → cheaper"
+                    },
+                )
             } else {
                 ("direct", if use_cn { "直连" } else { "direct" })
             };
@@ -517,11 +589,23 @@ async fn calls_page(
             let ago = if ago_secs < 60 {
                 if use_cn { "刚刚" } else { "just now" }.to_string()
             } else if ago_secs < 3600 {
-                if use_cn { format!("{}分钟前", ago_secs / 60) } else { format!("{}min ago", ago_secs / 60) }
+                if use_cn {
+                    format!("{}分钟前", ago_secs / 60)
+                } else {
+                    format!("{}min ago", ago_secs / 60)
+                }
             } else if ago_secs < 86400 {
-                if use_cn { format!("{}小时前", ago_secs / 3600) } else { format!("{}h ago", ago_secs / 3600) }
+                if use_cn {
+                    format!("{}小时前", ago_secs / 3600)
+                } else {
+                    format!("{}h ago", ago_secs / 3600)
+                }
             } else {
-                if use_cn { format!("{}天前", ago_secs / 86400) } else { format!("{}d ago", ago_secs / 86400) }
+                if use_cn {
+                    format!("{}天前", ago_secs / 86400)
+                } else {
+                    format!("{}d ago", ago_secs / 86400)
+                }
             };
             CallRow {
                 model: format!("{}/{}", c.provider, c.model),
@@ -602,21 +686,42 @@ async fn savings_page(
     let is_pro = state.routing_enabled;
 
     // Real savings from cache + routing
-    let cache_count = state.store.cache_stats().total_hits.saturating_sub(
-        state.store.cache_stats().total_entries,
-    ).max(0);
+    let cache_count = state
+        .store
+        .cache_stats()
+        .total_hits
+        .saturating_sub(state.store.cache_stats().total_entries)
+        .max(0);
     let cache_saved = crate::cost::calculator::format_usd(state.store.cache_savings_estimate());
-    let routing_count = if is_pro { state.store.routing_count(tenant_id) } else { 0 };
+    let routing_count = if is_pro {
+        state.store.routing_count(tenant_id)
+    } else {
+        0
+    };
     let routing_saved = {
-        let avg = if stats.total_calls > 0 { stats.total_cost / stats.total_calls as f64 } else { 0.0 };
-        let est = if routing_count > 0 { avg * 0.3 * routing_count as f64 } else { 0.0 };
+        let avg = if stats.total_calls > 0 {
+            stats.total_cost / stats.total_calls as f64
+        } else {
+            0.0
+        };
+        let est = if routing_count > 0 {
+            avg * 0.3 * routing_count as f64
+        } else {
+            0.0
+        };
         crate::cost::calculator::format_usd(est)
     };
     let total_saved_est = state.store.cache_savings_estimate()
         + if routing_count > 0 {
-            let avg = if stats.total_calls > 0 { stats.total_cost / stats.total_calls as f64 } else { 0.0 };
+            let avg = if stats.total_calls > 0 {
+                stats.total_cost / stats.total_calls as f64
+            } else {
+                0.0
+            };
             avg * 0.3 * routing_count as f64
-        } else { 0.0 };
+        } else {
+            0.0
+        };
     let total_saved = crate::cost::calculator::format_usd(total_saved_est);
 
     let month_cost = crate::cost::calculator::format_usd(stats.total_cost);
@@ -670,7 +775,10 @@ async fn token_distribution(
     Query(params): Query<HashMap<String, String>>,
 ) -> Json<Vec<serde_json::Value>> {
     let tenant_id = params.get("tenant").map(|s| s.as_str());
-    let dist = state.store.token_distribution(tenant_id).unwrap_or_default();
+    let dist = state
+        .store
+        .token_distribution(tenant_id)
+        .unwrap_or_default();
     let data: Vec<serde_json::Value> = dist
         .into_iter()
         .map(|m| {
@@ -687,11 +795,14 @@ async fn token_distribution(
 }
 
 /// GET /api/budget-status — returns current spending vs budget caps.
-async fn budget_status(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+async fn budget_status(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let now = chrono::Utc::now();
-    let today_start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
+    let today_start = now
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc()
+        .timestamp();
     let month_start = now.format("%Y-%m-01").to_string();
     let month_start_ts = chrono::NaiveDate::parse_from_str(&month_start, "%Y-%m-%d")
         .unwrap()
@@ -721,9 +832,7 @@ async fn budget_status(
     }))
 }
 
-async fn health(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+async fn health(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let db_ok = state.store.health_check().is_ok();
     let uptime = state.start_time.elapsed();
     Json(serde_json::json!({
@@ -736,9 +845,7 @@ async fn health(
 }
 
 /// POST /api/test-webhook — send a test notification to the configured webhook URL.
-async fn test_webhook(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+async fn test_webhook(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     if state.config.webhook.url.is_empty() {
         return Json(serde_json::json!({
             "ok": false,
@@ -858,7 +965,11 @@ async fn setup_save(
             chat_widget: chat_html,
             version: env!("CARGO_PKG_VERSION"),
         };
-        Html(t.render().unwrap_or_else(|e| format!("Template error: {e}"))).into_response()
+        Html(
+            t.render()
+                .unwrap_or_else(|e| format!("Template error: {e}")),
+        )
+        .into_response()
     } else {
         let t = SetupTemplate {
             step: 2,
@@ -868,7 +979,11 @@ async fn setup_save(
             chat_widget: chat_html,
             version: env!("CARGO_PKG_VERSION"),
         };
-        Html(t.render().unwrap_or_else(|e| format!("Template error: {e}"))).into_response()
+        Html(
+            t.render()
+                .unwrap_or_else(|e| format!("Template error: {e}")),
+        )
+        .into_response()
     }
 }
 
@@ -909,15 +1024,12 @@ async fn demo_chat(
     let total_tokens = prompt_tokens + completion_tokens;
 
     // Record a synthetic call so the user can see Dashboard tracking in action
-    let rec = crate::recording::CallRecord::from_request(
-        "demo",
-        "demo",
-        "simple",
-        false,
-        42,
-    )
-    .with_usage(prompt_tokens, completion_tokens);
-    let _ = state.store.record_call(&rec, &serde_json::json!({"messages":[{"role":"user","content":&msg}]}));
+    let rec = crate::recording::CallRecord::from_request("demo", "demo", "simple", false, 42)
+        .with_usage(prompt_tokens, completion_tokens);
+    let _ = state.store.record_call(
+        &rec,
+        &serde_json::json!({"messages":[{"role":"user","content":&msg}]}),
+    );
 
     Json(serde_json::json!({
         "choices": [{
@@ -958,8 +1070,7 @@ async fn fallback_404(
         .unwrap_or(false)
         || is_cn(&state);
 
-    let response = axum::response::Response::builder()
-        .status(axum::http::StatusCode::NOT_FOUND);
+    let response = axum::response::Response::builder().status(axum::http::StatusCode::NOT_FOUND);
 
     if use_cn {
         let t = Error404TemplateCn {

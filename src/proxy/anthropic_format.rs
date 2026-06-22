@@ -51,10 +51,7 @@ pub fn anthropic_to_openai(request: &serde_json::Value) -> serde_json::Value {
     // Copy conversation messages
     if let Some(msgs) = request.get("messages").and_then(|v| v.as_array()) {
         for msg in msgs {
-            let role = msg
-                .get("role")
-                .and_then(|v| v.as_str())
-                .unwrap_or("user");
+            let role = msg.get("role").and_then(|v| v.as_str()).unwrap_or("user");
             // Anthropic content can be a string or array of content blocks
             let content = if let Some(text) = msg.get("content").and_then(|v| v.as_str()) {
                 text.to_string()
@@ -671,10 +668,7 @@ mod tests {
         assert_eq!(anthropic["type"], "message");
         assert_eq!(anthropic["role"], "assistant");
         assert_eq!(anthropic["model"], "deepseek-chat");
-        assert_eq!(
-            anthropic["content"][0]["text"],
-            "I'm doing well, thanks!"
-        );
+        assert_eq!(anthropic["content"][0]["text"], "I'm doing well, thanks!");
         assert_eq!(anthropic["usage"]["input_tokens"], 15);
         assert_eq!(anthropic["usage"]["output_tokens"], 8);
         assert_eq!(anthropic["stop_reason"], "stop");
@@ -682,11 +676,8 @@ mod tests {
 
     #[test]
     fn test_anthropic_sse_state_basic() {
-        let mut state = AnthropicSseState::new(
-            "msg_001".to_string(),
-            "deepseek-chat".to_string(),
-            10,
-        );
+        let mut state =
+            AnthropicSseState::new("msg_001".to_string(), "deepseek-chat".to_string(), 10);
 
         // First chunk — should emit message_start + content_block_start
         // SSE lines must end with \n to be processed
@@ -720,11 +711,7 @@ mod tests {
 
     #[test]
     fn test_anthropic_sse_state_no_double_stop() {
-        let mut state = AnthropicSseState::new(
-            "msg_002".to_string(),
-            "test".to_string(),
-            0,
-        );
+        let mut state = AnthropicSseState::new("msg_002".to_string(), "test".to_string(), 0);
         let events1 = state.finalize();
         assert_eq!(events1.len(), 2); // message_delta + message_stop
         let events2 = state.finalize();
