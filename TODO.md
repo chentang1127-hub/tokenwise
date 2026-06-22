@@ -25,8 +25,8 @@
 
 ### 🟡 如果你要继续加功能
 
-- [ ] 看 [PLAN.md](PLAN.md) 第四章 — Phase 4 功能补齐（OpenRouter provider、预算上限等）
 - [ ] Alert 通知功能（竞品有，我们没有）
+- [ ] 看 [PROJECT_STATUS.md](PROJECT_STATUS.md) 战略摘要 — Phase 4 功能补齐
 
 ### 🔵 如果你想学习代码
 
