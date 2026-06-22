@@ -40,12 +40,13 @@ pub fn anthropic_to_openai(request: &serde_json::Value) -> serde_json::Value {
 
     // Anthropic puts system prompt as a top-level field
     if let Some(system) = request.get("system").and_then(|v| v.as_str())
-        && !system.is_empty() {
-            messages.push(serde_json::json!({
-                "role": "system",
-                "content": system
-            }));
-        }
+        && !system.is_empty()
+    {
+        messages.push(serde_json::json!({
+            "role": "system",
+            "content": system
+        }));
+    }
 
     // Copy conversation messages
     if let Some(msgs) = request.get("messages").and_then(|v| v.as_array()) {
@@ -329,9 +330,11 @@ impl AnthropicSseState {
                 .and_then(|c| c.get(0))
                 .and_then(|c| c.get("finish_reason"))
                 .and_then(|r| r.as_str())
-                && !reason.is_empty() && reason != "null" {
-                    self.finish_reason = Some(reason.to_string());
-                }
+            && !reason.is_empty()
+            && reason != "null"
+        {
+            self.finish_reason = Some(reason.to_string());
+        }
 
         // Extract usage (usually in the final chunk)
         if let Some(usage) = json.get("usage") {
@@ -548,10 +551,8 @@ where
                 let flush_events = state.flush_buffer();
                 let final_events = state.finalize();
                 drop(state);
-                let all_events: Vec<String> = flush_events
-                    .into_iter()
-                    .chain(final_events)
-                    .collect();
+                let all_events: Vec<String> =
+                    flush_events.into_iter().chain(final_events).collect();
                 if all_events.is_empty() {
                     this.state.lock().unwrap().done = true;
                     return Poll::Ready(None);
