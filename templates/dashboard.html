@@ -74,6 +74,11 @@
   .faq-item code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
 
   .footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px; }
+
+  /* Budget Banner */
+  .budget-warning { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: var(--yellow); display: flex; align-items: center; gap: 10px; line-height: 1.4; }
+  .budget-warning .icon { font-size: 18px; flex-shrink: 0; }
+  .budget-critical { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: var(--red); }
 </style>
 </head>
 <body hx-boost="true">
@@ -82,9 +87,13 @@
   <a href="/" class="active">Dashboard</a>
   <a href="/calls">Calls</a>
   <a href="/savings">Savings</a>
+  <a href="/settings">Settings</a>
   <a href="{{ lang_toggle_url }}" class="lang-toggle">{{ lang_toggle_label }}</a>
 </nav>
 <main>
+
+  <!-- Budget warning banner (HTMX poll every 60s) -->
+  <div id="budget-banner" hx-get="/api/budget-banner" hx-trigger="every 60s" hx-swap="innerHTML"></div>
 
   <!-- Hero -->
   {% if is_pro && savings_pct != "N/A" %}

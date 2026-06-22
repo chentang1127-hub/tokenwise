@@ -35,6 +35,9 @@
   .filter-sep { width: 1px; background: var(--border); margin: 0 4px; align-self: stretch; }
   .filter-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-right: 6px; font-weight: 600; }
 
+  /* Export Bar */
+  .export-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+
   table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; }
   th { text-align: left; color: var(--muted); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
   td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
@@ -68,6 +71,7 @@
   <a href="/">仪表板</a>
   <a href="/calls" class="active">调用记录</a>
   <a href="/savings">节省分析</a>
+  <a href="/settings">设置</a>
   <a href="{{ lang_toggle_url }}" class="lang-toggle">{{ lang_toggle_label }}</a>
 </nav>
 <main>
@@ -133,6 +137,12 @@
     <p>尝试扩大时间范围或更换筛选组合。</p>
   </div>
   {% else %}
+  <!-- 导出 -->
+  <div class="export-bar">
+    <span class="filter-label">导出</span>
+    <a href="/api/export/calls?format=csv{% if filters.range != "all" %}&range={{ filters.range }}{% endif %}" class="filter-pill">CSV</a>
+    <a href="/api/export/calls?format=json{% if filters.range != "all" %}&range={{ filters.range }}{% endif %}" class="filter-pill">JSON</a>
+  </div>
   <table>
     <thead><tr>
       <th>模型</th>

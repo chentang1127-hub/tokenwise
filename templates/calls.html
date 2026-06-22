@@ -37,6 +37,9 @@
   .filter-sep { width: 1px; background: var(--border); margin: 0 4px; align-self: stretch; }
   .filter-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-right: 6px; font-weight: 600; }
 
+  /* Export Bar */
+  .export-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+
   /* Table */
   table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; }
   th { text-align: left; color: var(--muted); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
@@ -73,6 +76,7 @@
   <a href="/">Dashboard</a>
   <a href="/calls" class="active">Calls</a>
   <a href="/savings">Savings</a>
+  <a href="/settings">Settings</a>
   <a href="{{ lang_toggle_url }}" class="lang-toggle">{{ lang_toggle_label }}</a>
 </nav>
 <main>
@@ -140,6 +144,12 @@
     <p>Try a wider time range or different filter combination.</p>
   </div>
   {% else %}
+  <!-- Export Bar -->
+  <div class="export-bar">
+    <span class="filter-label">Export</span>
+    <a href="/api/export/calls?format=csv{% if filters.range != "all" %}&range={{ filters.range }}{% endif %}" class="filter-pill">CSV</a>
+    <a href="/api/export/calls?format=json{% if filters.range != "all" %}&range={{ filters.range }}{% endif %}" class="filter-pill">JSON</a>
+  </div>
   <table>
     <thead><tr>
       <th>Model</th>

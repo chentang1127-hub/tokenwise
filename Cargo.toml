@@ -1,6 +1,6 @@
 [package]
 name = "tokenwise"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 description = "A Rust transparent proxy that saves 70-90% on AI API costs"
 license = "MIT"

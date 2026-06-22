@@ -65,6 +65,16 @@ pub enum WebhookEvent {
         current_cost: f64,
         avg_cost: f64,
     },
+    /// Daily usage summary (fired once per day by background task).
+    UsageReport {
+        date: String,
+        total_calls: i64,
+        total_cost: f64,
+        total_prompt_tokens: i64,
+        total_completion_tokens: i64,
+        cache_hits: i64,
+        routed_calls: i64,
+    },
 }
 
 /// Stateful webhook dispatcher with cooldown tracking.
@@ -77,6 +87,8 @@ pub struct WebhookDispatcher {
     last_budget_exceeded_monthly: i64,
     #[allow(dead_code)]
     last_anomaly: i64,
+    /// Date of last usage report (YYYY-MM-DD) to prevent duplicate daily reports.
+    last_usage_report_date: String,
 }
 
 impl WebhookDispatcher {
@@ -92,6 +104,7 @@ impl WebhookDispatcher {
             last_budget_exceeded_daily: 0,
             last_budget_exceeded_monthly: 0,
             last_anomaly: 0,
+            last_usage_report_date: String::new(),
         })
     }
 
@@ -160,6 +173,38 @@ impl WebhookDispatcher {
                     .await;
             }
         }
+    }
+
+    /// Fire a daily UsageReport webhook if the date has changed since the last report.
+    /// Returns true if a report was sent.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn send_usage_report(
+        &mut self,
+        _now: i64,
+        total_calls: i64,
+        total_cost: f64,
+        total_prompt_tokens: i64,
+        total_completion_tokens: i64,
+        cache_hits: i64,
+        routed_calls: i64,
+    ) -> bool {
+        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        if today == self.last_usage_report_date {
+            return false;
+        }
+        self.last_usage_report_date = today.clone();
+        let _ = self
+            .send(WebhookEvent::UsageReport {
+                date: today,
+                total_calls,
+                total_cost,
+                total_prompt_tokens,
+                total_completion_tokens,
+                cache_hits,
+                routed_calls,
+            })
+            .await;
+        true
     }
 
     /// Send a webhook event via HTTP POST.

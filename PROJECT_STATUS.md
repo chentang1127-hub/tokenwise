@@ -1,6 +1,6 @@
 # TokenWise Core — 项目全景进度图
 
-> 2026-06-22 · 51 tests (36 unit + 15 integration) · ~7,000 行 Rust · 14 HTML 模板 · P1+P2+P3+P4 全部完成
+> 2026-06-22 · 51 tests (36 unit + 15 integration) · ~7,500 行 Rust · 16 HTML 模板 · P1+P2+P3+P4+P5 全部完成
 
 ---
 
@@ -329,6 +329,16 @@ HTTP Request 到达 :9401
 | 1 | Webhook 接入 proxy 请求流 | ✅ |
 | 2 | Dashboard 多租户过滤 (`?tenant=`) | ✅ |
 
+### 🔵 P5 — ✅ 全部完成
+
+| # | 任务 | 状态 |
+|---|------|------|
+| 10 | Try It Widget 流式响应 (SSE + 打字机效果) | ✅ |
+| 11 | 用量告警增强 (后台定期检查 + UsageReport 日报) | ✅ |
+| 12 | 数据导出 CSV/JSON (Calls + Savings) | ✅ |
+| 13 | 多 Key 管理 (localStorage, 标签+提供商) | ✅ |
+| 14 | Settings 页面 (路由关键词 + Webhook 配置 UI) | ✅ |
+
 ### 🟢 P2 — ✅ 全部完成
 
 | # | 任务 | 状态 |
@@ -360,7 +370,7 @@ tokenwise status                    # 检查 proxy/dashboard 运行状态
 ```bash
 cargo build              # 调试构建
 cargo build --release    # 发布构建 (~12 MB)
-cargo test               # 48 测试 (36 单元 + 12 集成)
+cargo test               # 51 测试 (36 单元 + 15 集成)
 cargo clippy             # Lint 检查
 cargo fmt                # 格式化
 ```
@@ -417,11 +427,21 @@ v0.5.0  ✅ P4 打磨
   ├─ 错误页 404/500/429 (中英双语，暗色主题)
   ├─ Webhook 测试端点 (POST /api/test-webhook)
   └─ Savings 页面真实数据驱动
+  │
+v0.6.0  ✅ P5 功能增强
+  │
+  ├─ Try It 流式响应 (SSE解析+打字机效果+实时token计数)
+  ├─ 用量告警增强 (后台5分钟定期检查+UsageReport日报)
+  ├─ Dashboard 预算警告横幅 (HTMX轮询, 黄/红双色)
+  ├─ 数据导出 CSV/JSON (Calls列表+Savings摘要)
+  ├─ 多 Key 管理 (localStorage多Key, 标签+提供商+一键切换)
+  ├─ Settings 页面 (路由关键词编辑+Webhook配置+测试)
+  └─ Config::save() 解锁 (YAML写回, 路由+Webhook可持久化)
 ```
 
 ---
 
-**当前版本: v0.5.0 · 51 tests (36 unit + 15 integration) · 0 warnings · P1+P2+P3+P4 全部完成 · 生产可用**
+**当前版本: v0.6.0 · 51 tests (36 unit + 15 integration) · 0 warnings · P1+P2+P3+P4+P5 全部完成 · 生产可用**
 
 ### 版本历史
 
@@ -432,3 +452,4 @@ v0.5.0  ✅ P4 打磨
 | v0.3.0 | Webhook 接入、多租户过滤、gRPC、流式安全兜底 |
 | v0.4.0 | Docker 部署、systemd、env override、Backup/Status CLI |
 | v0.5.0 | Dashboard 重构、真实 Savings、动态版本、错误页、Try It 折叠 |
+| v0.6.0 | 流式 Try It、用量告警、数据导出、多 Key 管理、Settings 页面 |

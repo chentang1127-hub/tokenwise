@@ -263,8 +263,7 @@ impl Config {
         !Path::new(".tokenwise_setup_done").exists()
     }
 
-    /// Serialize config back to YAML on disk (used by Pro setup wizard).
-    #[allow(dead_code)]
+    /// Serialize config back to YAML on disk (used by Settings page and Pro setup wizard).
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
         let yaml = serde_yaml::to_string(self)?;
         fs::write(path, yaml)?;

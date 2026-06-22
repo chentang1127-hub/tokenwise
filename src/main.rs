@@ -358,6 +358,67 @@ async fn main() {
             let webhook = WebhookDispatcher::new(cfg.webhook.clone())
                 .map(|d| Arc::new(tokio::sync::Mutex::new(d)));
 
+            // Spawn periodic budget check + daily usage report (every 5 minutes)
+            if let Some(ref webhook_arc) = webhook {
+                let periodic_store = store.clone();
+                let periodic_cfg = cfg.clone();
+                let periodic_webhook = webhook_arc.clone();
+                tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
+                    loop {
+                        interval.tick().await;
+                        let now_ts = chrono::Utc::now().timestamp();
+                        let today_start = chrono::Utc::now()
+                            .date_naive()
+                            .and_hms_opt(0, 0, 0)
+                            .unwrap()
+                            .and_utc()
+                            .timestamp();
+                        let spent_today = periodic_store.total_cost_since(today_start);
+                        let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
+                        let month_start_ts =
+                            chrono::NaiveDate::parse_from_str(&month_start, "%Y-%m-%d")
+                                .unwrap()
+                                .and_hms_opt(0, 0, 0)
+                                .unwrap()
+                                .and_utc()
+                                .timestamp();
+                        let spent_month = periodic_store.total_cost_since(month_start_ts);
+
+                        // Budget alerts (warning / exceeded with cooldown)
+                        let mut dispatcher = periodic_webhook.lock().await;
+                        dispatcher
+                            .check_budget(
+                                spent_today,
+                                periodic_cfg.budget.daily_limit_usd,
+                                spent_month,
+                                periodic_cfg.budget.monthly_limit_usd,
+                                now_ts,
+                            )
+                            .await;
+
+                        // Daily usage report
+                        let monthly_stats = periodic_store.monthly_stats(None).unwrap_or_default();
+                        let cache_stats = periodic_store.cache_stats();
+                        let routing_count = periodic_store.routing_count(None);
+                        dispatcher
+                            .send_usage_report(
+                                now_ts,
+                                monthly_stats.total_calls,
+                                monthly_stats.total_cost,
+                                monthly_stats.total_prompt_tokens,
+                                monthly_stats.total_completion_tokens,
+                                cache_stats
+                                    .total_hits
+                                    .saturating_sub(cache_stats.total_entries)
+                                    .max(0),
+                                routing_count,
+                            )
+                            .await;
+                    }
+                });
+            }
+
             let proxy_service = proxy::build_service(
                 cfg,
                 store.clone(),

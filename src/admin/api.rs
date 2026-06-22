@@ -23,6 +23,15 @@ pub fn make_router(state: Arc<AppState>) -> Router {
         .route("/api/token-distribution", get(token_distribution))
         .route("/api/budget-status", get(budget_status))
         .route("/api/test-webhook", post(test_webhook))
+        .route("/api/export/calls", get(export_calls))
+        .route("/api/export/savings", get(export_savings))
+        .route(
+            "/api/webhook-config",
+            get(get_webhook_config).post(save_webhook_config),
+        )
+        .route("/api/settings/routing", post(save_routing))
+        .route("/api/budget-banner", get(budget_banner))
+        .route("/settings", get(settings_page))
         .route("/metrics", get(super::metrics::metrics_handler))
         .route("/health", get(health))
         .fallback(fallback_404)
@@ -154,6 +163,36 @@ struct SetupTemplateCn {
     lang_toggle_url: &'static str,
     proxy_url: String,
     chat_widget: String,
+    version: &'static str,
+}
+
+// ── Settings Templates ────────────────────────────────
+
+#[derive(Template)]
+#[template(path = "settings.html")]
+struct SettingsTemplate {
+    simple_keywords: String,
+    complex_keywords: String,
+    webhook_url: String,
+    webhook_warning_pct: String,
+    webhook_cooldown_secs: String,
+    webhook_anomaly: bool,
+    lang_toggle_label: &'static str,
+    lang_toggle_url: &'static str,
+    version: &'static str,
+}
+
+#[derive(Template)]
+#[template(path = "cn/settings.html")]
+struct SettingsTemplateCn {
+    simple_keywords: String,
+    complex_keywords: String,
+    webhook_url: String,
+    webhook_warning_pct: String,
+    webhook_cooldown_secs: String,
+    webhook_anomaly: bool,
+    lang_toggle_label: &'static str,
+    lang_toggle_url: &'static str,
     version: &'static str,
 }
 
@@ -985,6 +1024,320 @@ async fn setup_save(
         )
         .into_response()
     }
+}
+
+// ── Settings Handlers ──────────────────────────────────
+
+/// GET /settings — edit routing keywords + webhook config.
+async fn settings_page(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Html<String> {
+    let (use_cn, lang_toggle_label, lang_toggle_url) = resolve_lang(&params, &state);
+
+    let simple_keywords = state.config.routing.simple_keywords.join("\n");
+    let complex_keywords = state.config.routing.complex_keywords.join("\n");
+    let webhook_warning_pct = format!("{:.0}", state.config.webhook.budget_warning_pct * 100.0);
+    let webhook_cooldown_secs = state.config.webhook.cooldown_secs.to_string();
+
+    if use_cn {
+        let t = SettingsTemplateCn {
+            simple_keywords,
+            complex_keywords,
+            webhook_url: state.config.webhook.url.clone(),
+            webhook_warning_pct,
+            webhook_cooldown_secs,
+            webhook_anomaly: state.config.webhook.anomaly_detection,
+            lang_toggle_label,
+            lang_toggle_url,
+            version: env!("CARGO_PKG_VERSION"),
+        };
+        Html(
+            t.render()
+                .unwrap_or_else(|e| format!("Template error: {e}")),
+        )
+    } else {
+        let t = SettingsTemplate {
+            simple_keywords,
+            complex_keywords,
+            webhook_url: state.config.webhook.url.clone(),
+            webhook_warning_pct,
+            webhook_cooldown_secs,
+            webhook_anomaly: state.config.webhook.anomaly_detection,
+            lang_toggle_label,
+            lang_toggle_url,
+            version: env!("CARGO_PKG_VERSION"),
+        };
+        Html(
+            t.render()
+                .unwrap_or_else(|e| format!("Template error: {e}")),
+        )
+    }
+}
+
+#[derive(Deserialize)]
+struct RoutingSavePayload {
+    simple_keywords: Vec<String>,
+    complex_keywords: Vec<String>,
+}
+
+/// POST /api/settings/routing — save routing keywords to config.yaml.
+async fn save_routing(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<RoutingSavePayload>,
+) -> Json<serde_json::Value> {
+    let mut cfg = (*state.config).clone();
+    cfg.routing.simple_keywords = body.simple_keywords;
+    cfg.routing.complex_keywords = body.complex_keywords;
+
+    match cfg.save(&state.config_path) {
+        Ok(()) => Json(serde_json::json!({"ok": true})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+    }
+}
+
+/// GET /api/webhook-config — return current webhook configuration.
+async fn get_webhook_config(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "url": state.config.webhook.url,
+        "budget_warning_pct": state.config.webhook.budget_warning_pct,
+        "cooldown_secs": state.config.webhook.cooldown_secs,
+        "anomaly_detection": state.config.webhook.anomaly_detection,
+    }))
+}
+
+#[derive(Deserialize)]
+struct WebhookConfigPayload {
+    url: String,
+    budget_warning_pct: Option<f64>,
+    cooldown_secs: Option<u64>,
+    anomaly_detection: Option<bool>,
+}
+
+/// POST /api/webhook-config — save webhook configuration to config.yaml.
+async fn save_webhook_config(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<WebhookConfigPayload>,
+) -> Json<serde_json::Value> {
+    let mut cfg = (*state.config).clone();
+    cfg.webhook.url = body.url;
+    if let Some(pct) = body.budget_warning_pct {
+        cfg.webhook.budget_warning_pct = pct.clamp(0.0, 1.0);
+    }
+    if let Some(secs) = body.cooldown_secs {
+        cfg.webhook.cooldown_secs = secs;
+    }
+    if let Some(anomaly) = body.anomaly_detection {
+        cfg.webhook.anomaly_detection = anomaly;
+    }
+
+    match cfg.save(&state.config_path) {
+        Ok(()) => Json(serde_json::json!({"ok": true})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+    }
+}
+
+/// GET /api/budget-banner — returns an HTML banner if budget is >80% spent.
+async fn budget_banner(State(state): State<Arc<AppState>>) -> Html<String> {
+    let now = chrono::Utc::now();
+    let today_start = now
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc()
+        .timestamp();
+    let spent_today = state.store.total_cost_since(today_start);
+    let daily_limit = state.config.budget.daily_limit_usd;
+
+    let month_start = now.format("%Y-%m-01").to_string();
+    let month_start_ts = chrono::NaiveDate::parse_from_str(&month_start, "%Y-%m-%d")
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc()
+        .timestamp();
+    let spent_month = state.store.total_cost_since(month_start_ts);
+    let monthly_limit = state.config.budget.monthly_limit_usd;
+
+    let mut warnings = Vec::new();
+
+    if daily_limit > 0.0 {
+        let pct = (spent_today / daily_limit * 100.0).min(100.0);
+        if pct >= 100.0 {
+            warnings.push(format!(
+                "Daily budget exceeded: ${:.4} / ${:.2} (100%)",
+                spent_today, daily_limit
+            ));
+        } else if pct >= state.config.webhook.budget_warning_pct * 100.0 {
+            warnings.push(format!(
+                "Daily budget warning: ${:.4} / ${:.2} ({:.0}%)",
+                spent_today, daily_limit, pct
+            ));
+        }
+    }
+
+    if monthly_limit > 0.0 {
+        let pct = (spent_month / monthly_limit * 100.0).min(100.0);
+        if pct >= 100.0 {
+            warnings.push(format!(
+                "Monthly budget exceeded: ${:.4} / ${:.2} (100%)",
+                spent_month, monthly_limit
+            ));
+        } else if pct >= state.config.webhook.budget_warning_pct * 100.0 {
+            warnings.push(format!(
+                "Monthly budget warning: ${:.4} / ${:.2} ({:.0}%)",
+                spent_month, monthly_limit, pct
+            ));
+        }
+    }
+
+    if warnings.is_empty() {
+        return Html(String::new());
+    }
+
+    let is_critical = warnings.iter().any(|w| w.contains("exceeded"));
+    let class = if is_critical {
+        "budget-warning budget-critical"
+    } else {
+        "budget-warning"
+    };
+    let joined = warnings.join(" · ");
+
+    Html(format!(
+        r#"<div class="{class}"><span class="icon">{icon}</span>{msg}</div>"#,
+        class = class,
+        icon = if is_critical { "⛔" } else { "⚠️" },
+        msg = joined,
+    ))
+}
+
+// ── Export Handlers ────────────────────────────────────
+
+#[derive(Deserialize)]
+struct ExportQuery {
+    format: Option<String>,
+    range: Option<String>,
+    tenant: Option<String>,
+}
+
+/// GET /api/export/calls — export call history as CSV or JSON.
+async fn export_calls(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<ExportQuery>,
+) -> impl IntoResponse {
+    let range_hours = match params.range.as_deref() {
+        Some("24h") => Some(24u32),
+        Some("7d") => Some(168u32),
+        Some("30d") => Some(720u32),
+        _ => None,
+    };
+    let tenant_id = params.tenant.as_deref();
+    let calls = state
+        .store
+        .recent_calls_filtered(100_000, 0, range_hours, None, None, tenant_id)
+        .unwrap_or_default();
+
+    match params.format.as_deref() {
+        Some("json") => {
+            let data: Vec<serde_json::Value> = calls
+                .iter()
+                .map(|c| {
+                    let ts = chrono::DateTime::from_timestamp(c.timestamp, 0)
+                        .map(|d| d.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+                        .unwrap_or_default();
+                    serde_json::json!({
+                        "timestamp": ts,
+                        "model": c.model,
+                        "provider": c.provider,
+                        "complexity": c.complexity,
+                        "prompt_tokens": c.prompt_tokens,
+                        "completion_tokens": c.completion_tokens,
+                        "cost_usd": c.cost_usd,
+                        "latency_ms": c.latency_ms,
+                        "was_routed": c.was_routed,
+                        "finish_reason": c.finish_reason,
+                    })
+                })
+                .collect();
+            let body = serde_json::to_string_pretty(&data).unwrap_or_default();
+            (axum::response::Response::builder()
+                .header("content-type", "application/json; charset=utf-8")
+                .header(
+                    "content-disposition",
+                    "attachment; filename=\"tokenwise_calls.json\"",
+                )
+                .body(axum::body::Body::from(body))
+                .unwrap(),)
+                .into_response()
+        }
+        _ => {
+            let mut csv = String::from(
+                "timestamp,model,provider,complexity,prompt_tokens,completion_tokens,cost_usd,latency_ms,was_routed,finish_reason\n",
+            );
+            for c in &calls {
+                let ts = chrono::DateTime::from_timestamp(c.timestamp, 0)
+                    .map(|d| d.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+                    .unwrap_or_default();
+                csv.push_str(&format!(
+                    "{},{},{},{},{},{},{:.6},{},{},{}\n",
+                    ts,
+                    csv_escape(&c.model),
+                    csv_escape(&c.provider),
+                    c.complexity,
+                    c.prompt_tokens,
+                    c.completion_tokens,
+                    c.cost_usd,
+                    c.latency_ms,
+                    if c.was_routed { "true" } else { "false" },
+                    c.finish_reason.as_deref().unwrap_or(""),
+                ));
+            }
+            (axum::response::Response::builder()
+                .header("content-type", "text/csv; charset=utf-8")
+                .header(
+                    "content-disposition",
+                    "attachment; filename=\"tokenwise_calls.csv\"",
+                )
+                .body(axum::body::Body::from(csv))
+                .unwrap(),)
+                .into_response()
+        }
+    }
+}
+
+fn csv_escape(s: &str) -> String {
+    if s.contains(',') || s.contains('"') || s.contains('\n') {
+        format!("\"{}\"", s.replace('"', "\"\""))
+    } else {
+        s.to_string()
+    }
+}
+
+/// GET /api/export/savings — export savings summary as JSON.
+async fn export_savings(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let tenant_id = params.get("tenant").map(|s| s.as_str());
+    let stats = state.store.monthly_stats(tenant_id).unwrap_or_default();
+    let cache_stats = state.store.cache_stats();
+    let routing_count = if state.routing_enabled {
+        state.store.routing_count(tenant_id)
+    } else {
+        0
+    };
+
+    Json(serde_json::json!({
+        "month": chrono::Utc::now().format("%Y-%m").to_string(),
+        "total_calls": stats.total_calls,
+        "total_cost_usd": stats.total_cost,
+        "total_prompt_tokens": stats.total_prompt_tokens,
+        "total_completion_tokens": stats.total_completion_tokens,
+        "cache_hits": cache_stats.total_hits.saturating_sub(cache_stats.total_entries).max(0),
+        "cache_entries": cache_stats.total_entries,
+        "routed_calls": routing_count,
+        "cache_savings_estimate_usd": state.store.cache_savings_estimate(),
+    }))
 }
 
 // ── Demo Chat Endpoint ──────────────────────────────────
