@@ -10,6 +10,46 @@
 
 ---
 
+## 战略摘要（来自 PLAN.md，已合并）
+
+### 定位演进
+
+| | 旧定位 | 新定位 |
+|---|---|---|
+| 说法 | "帮你省 LLM API 费用的工具" | "Self-hosted execution layer for LLM applications" |
+| 归类 | billing optimizer / cost tool | infrastructure primitive |
+| 天花板 | 省钱面板 | 开发者基础设施 |
+
+### vs 竞品 TokenWise HQ
+
+| | TokenWise HQ | TokenWise Core（我们） |
+|---|---|---|
+| 形态 | SaaS 云端代理 | 自托管本地二进制 |
+| 信任模型 | 必须信任 SaaS | 零信任，内容从不落盘 |
+| 接入方式 | `npx` SDK wrapper | `OPENAI_BASE_URL` 环境变量 |
+| 定价 | 按月订阅 ($9.50-39.50/mo) | Pro 一次性买断 ($29-49) |
+| 开源可审计 | ❌ | ✅ |
+| 离线可用 | ❌ | ✅ |
+
+**核心差异：** 他们强在功能广度，我们强在信任模型。我们的护城河是数据不离开用户机器。
+
+### 目标用户
+
+| 用户 | 为什么选我们 |
+|------|-------------|
+| 企业/合规团队 | 数据不能离开服务器，法律不允许上 SaaS |
+| AI infra builder | 需要可控的执行链，SaaS 不够底层 |
+| Power indie dev | 不想被 lock-in，信任偏好 + 预算 |
+
+### Pro 定价
+
+| | 免费版 | Pro |
+|---|---|---|
+| 价格 | 永久免费 | $29-49 一次性买断 |
+| 功能 | 基本路由 + 追踪 | 智能路由 + 语义缓存 + 安全兜底 + 通知 |
+
+---
+
 ## 一、架构全景图
 
 ```
