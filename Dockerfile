@@ -5,7 +5,7 @@
 # Run:     docker run -p 9400-9401:9400-9401 -v ./data:/app tokenwise
 # Compose: docker compose up -d
 
-FROM rust:1.85-alpine AS builder
+FROM rust:1.96-alpine AS builder
 
 RUN apk add --no-cache musl-dev pkgconfig
 
