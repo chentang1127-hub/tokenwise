@@ -108,6 +108,11 @@ impl SemanticCache {
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+
+    /// Returns true if the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 }
 
 /// Tokenize text into lowercase word set for Jaccard comparison.

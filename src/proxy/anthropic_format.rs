@@ -39,14 +39,13 @@ pub fn anthropic_to_openai(request: &serde_json::Value) -> serde_json::Value {
     let mut messages = Vec::new();
 
     // Anthropic puts system prompt as a top-level field
-    if let Some(system) = request.get("system").and_then(|v| v.as_str()) {
-        if !system.is_empty() {
+    if let Some(system) = request.get("system").and_then(|v| v.as_str())
+        && !system.is_empty() {
             messages.push(serde_json::json!({
                 "role": "system",
                 "content": system
             }));
         }
-    }
 
     // Copy conversation messages
     if let Some(msgs) = request.get("messages").and_then(|v| v.as_array()) {
@@ -61,7 +60,7 @@ pub fn anthropic_to_openai(request: &serde_json::Value) -> serde_json::Value {
                     .filter_map(|b| {
                         b.get("text")
                             .and_then(|t| t.as_str())
-                            .or_else(|| b.get("type").and_then(|_| Some("")))
+                            .or_else(|| b.get("type").map(|_| ""))
                     })
                     .filter(|s| !s.is_empty())
                     .collect::<Vec<_>>()
@@ -324,18 +323,15 @@ impl AnthropicSseState {
         }
 
         // Extract finish reason
-        if self.finish_reason.is_none() {
-            if let Some(reason) = json
+        if self.finish_reason.is_none()
+            && let Some(reason) = json
                 .get("choices")
                 .and_then(|c| c.get(0))
                 .and_then(|c| c.get("finish_reason"))
                 .and_then(|r| r.as_str())
-            {
-                if !reason.is_empty() && reason != "null" {
+                && !reason.is_empty() && reason != "null" {
                     self.finish_reason = Some(reason.to_string());
                 }
-            }
-        }
 
         // Extract usage (usually in the final chunk)
         if let Some(usage) = json.get("usage") {
@@ -521,7 +517,7 @@ where
                     out.push_str(event);
                 }
                 let out_bytes = out.into_bytes();
-                return Poll::Ready(Some(Ok(Bytes::from(out_bytes))));
+                Poll::Ready(Some(Ok(Bytes::from(out_bytes))))
             }
             Poll::Ready(Some(Err(e))) => {
                 warn!("Upstream stream error in Anthropic adapter: {e}");
@@ -540,7 +536,7 @@ where
                     let data = std::mem::take(&mut this.output_buf);
                     return Poll::Ready(Some(Ok(Bytes::from(data))));
                 }
-                return Poll::Ready(Some(Err(e.to_string())));
+                Poll::Ready(Some(Err(e.to_string())))
             }
             Poll::Ready(None) => {
                 // Upstream exhausted — flush buffer then send final events
@@ -554,7 +550,7 @@ where
                 drop(state);
                 let all_events: Vec<String> = flush_events
                     .into_iter()
-                    .chain(final_events.into_iter())
+                    .chain(final_events)
                     .collect();
                 if all_events.is_empty() {
                     this.state.lock().unwrap().done = true;

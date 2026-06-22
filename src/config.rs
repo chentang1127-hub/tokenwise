@@ -238,21 +238,18 @@ impl Config {
         if let Ok(v) = env::var("TW_LOCALE") {
             self.locale = v;
         }
-        if let Ok(v) = env::var("TW_BUDGET_DAILY") {
-            if let Ok(val) = v.parse::<f64>() {
+        if let Ok(v) = env::var("TW_BUDGET_DAILY")
+            && let Ok(val) = v.parse::<f64>() {
                 self.budget.daily_limit_usd = val;
             }
-        }
-        if let Ok(v) = env::var("TW_BUDGET_MONTHLY") {
-            if let Ok(val) = v.parse::<f64>() {
+        if let Ok(v) = env::var("TW_BUDGET_MONTHLY")
+            && let Ok(val) = v.parse::<f64>() {
                 self.budget.monthly_limit_usd = val;
             }
-        }
-        if let Ok(v) = env::var("TW_CACHE_TTL") {
-            if let Ok(val) = v.parse::<u32>() {
+        if let Ok(v) = env::var("TW_CACHE_TTL")
+            && let Ok(val) = v.parse::<u32>() {
                 self.cache.ttl_hours = val;
             }
-        }
     }
 
     /// Returns true on first run — checks for a marker file written by the

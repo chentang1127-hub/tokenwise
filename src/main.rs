@@ -195,8 +195,8 @@ async fn main() {
             let proxy_parts: Vec<&str> = cfg.proxy.listen.split(':').collect();
             let admin_parts: Vec<&str> = cfg.proxy.admin.split(':').collect();
 
-            let proxy_port = proxy_parts.last().map(|s| *s).unwrap_or("9401");
-            let admin_port = admin_parts.last().map(|s| *s).unwrap_or("9400");
+            let proxy_port = proxy_parts.last().copied().unwrap_or("9401");
+            let admin_port = admin_parts.last().copied().unwrap_or("9400");
 
             // Check if the process is running by connecting to the health endpoint
             let client = reqwest::blocking::Client::builder()
