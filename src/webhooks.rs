@@ -98,6 +98,12 @@ pub struct WebhookDispatcher {
     last_anomaly: i64,
     /// Date of last usage report (YYYY-MM-DD) to prevent duplicate daily reports.
     last_usage_report_date: String,
+    /// Running average of cost delta per check interval (for anomaly detection).
+    avg_cost_delta: f64,
+    /// Total cost at last anomaly check (to compute delta).
+    last_total_cost: f64,
+    /// Number of anomaly samples collected (for running average).
+    anomaly_samples: u64,
 }
 
 impl WebhookDispatcher {
@@ -114,6 +120,9 @@ impl WebhookDispatcher {
             last_budget_exceeded_monthly: 0,
             last_anomaly: 0,
             last_usage_report_date: String::new(),
+            avg_cost_delta: 0.0,
+            last_total_cost: 0.0,
+            anomaly_samples: 0,
         })
     }
 
@@ -181,6 +190,48 @@ impl WebhookDispatcher {
                 let _ = self.send(event.clone()).await;
                 self.notify_telegram(&event).await;
             }
+        }
+    }
+
+    /// Check for anomalous spending (sudden spike).
+    /// Compares current cost delta against a running average.
+    /// Fires when current delta exceeds 3x the average and anomaly_detection is enabled.
+    pub async fn check_anomaly(&mut self, current_total_cost: f64, now: i64) {
+        if !self.config.anomaly_detection {
+            return;
+        }
+        let cooldown = self.config.cooldown_secs as i64;
+        let delta = current_total_cost - self.last_total_cost;
+        self.last_total_cost = current_total_cost;
+
+        // Build running average over first 12 samples (1 hour at 5-min intervals)
+        if self.anomaly_samples < 12 {
+            self.avg_cost_delta =
+                (self.avg_cost_delta * self.anomaly_samples as f64 + delta)
+                    / (self.anomaly_samples + 1) as f64;
+            self.anomaly_samples += 1;
+            return;
+        }
+
+        // Update running average with decay
+        self.avg_cost_delta = self.avg_cost_delta * 0.9 + delta * 0.1;
+
+        // Fire if current delta > 3x average AND cooldown has passed
+        if delta > self.avg_cost_delta * 3.0
+            && self.avg_cost_delta > 0.001
+            && now - self.last_anomaly > cooldown
+        {
+            self.last_anomaly = now;
+            let event = WebhookEvent::AnomalyDetected {
+                message: format!(
+                    "Spending spike: ${delta:.4} in last interval vs ${:.4} avg",
+                    self.avg_cost_delta
+                ),
+                current_cost: delta,
+                avg_cost: self.avg_cost_delta,
+            };
+            let _ = self.send(event.clone()).await;
+            self.notify_telegram(&event).await;
         }
     }
 

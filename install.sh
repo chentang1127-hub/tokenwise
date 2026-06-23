@@ -92,6 +92,7 @@ proxy:
   listen: "127.0.0.1:9401"
   admin: "127.0.0.1:9400"
   timeout_secs: 120
+  bypass: false
 
 providers:
   - name: "deepseek"
@@ -106,6 +107,14 @@ providers:
         tier: "premium"
         cost_per_1k_prompt: 0.00055
         cost_per_1k_completion: 0.00219
+      - id: "deepseek-v4-pro"
+        tier: "premium"
+        cost_per_1k_prompt: 0.00055
+        cost_per_1k_completion: 0.00219
+      - id: "deepseek-v4-flash"
+        tier: "cheap"
+        cost_per_1k_prompt: 0.00015
+        cost_per_1k_completion: 0.0006
 
   - name: "openai"
     base_url: "https://api.openai.com/v1"
@@ -123,6 +132,19 @@ providers:
         tier: "cheap"
         cost_per_1k_prompt: 0.00005
         cost_per_1k_completion: 0.0002
+
+  - name: "anthropic"
+    base_url: "https://api.anthropic.com/v1"
+    api_key_env: "ANTHROPIC_API_KEY"
+    models:
+      - id: "claude-sonnet-4-6"
+        tier: "premium"
+        cost_per_1k_prompt: 0.003
+        cost_per_1k_completion: 0.015
+      - id: "claude-haiku-4-5"
+        tier: "mid"
+        cost_per_1k_prompt: 0.0008
+        cost_per_1k_completion: 0.004
 
   - name: "openrouter"
     base_url: "https://openrouter.ai/api/v1"

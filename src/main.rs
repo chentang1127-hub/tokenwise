@@ -397,6 +397,9 @@ async fn main() {
                             )
                             .await;
 
+                        // Anomaly detection (spending spike check)
+                        dispatcher.check_anomaly(spent_today, now_ts).await;
+
                         // Daily usage report
                         let monthly_stats = periodic_store.monthly_stats(None).unwrap_or_default();
                         let cache_stats = periodic_store.cache_stats();
