@@ -1,0 +1,57 @@
+<style>
+:root {
+  --bg: #0f172a; --card-bg: #1e293b; --border: #334155;
+  --text: #e2e8f0; --muted: #94a3b8; --green: #22c55e; --blue: #3b82f6;
+  --purple: #a855f7; --red: #ef4444; --yellow: #eab308;
+  --radius: 8px; --radius-lg: 10px;
+  --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* Navigation */
+nav { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 0 var(--space-lg); display: flex; gap: var(--space-lg); align-items: center; height: 56px; }
+nav a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; padding: var(--space-sm) 12px; border-radius: 6px; transition: all 0.15s; }
+nav a:hover, nav a.active { color: var(--text); background: rgba(255,255,255,0.05); }
+nav .brand { font-weight: 700; font-size: 18px; color: var(--green); }
+nav .lang-toggle { margin-left: auto; border: 1px solid var(--border); padding: 4px 10px; font-size: 12px; }
+
+/* Cards */
+.card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-lg); margin-bottom: var(--space-lg); }
+.card h3 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-sm); }
+
+/* Buttons */
+.btn { display: inline-block; padding: 10px 24px; border-radius: var(--radius); font-weight: 600; font-size: 14px; cursor: pointer; border: none; text-decoration: none; }
+.btn-primary { background: var(--green); color: #000; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+.btn-outline:hover { color: var(--text); border-color: var(--muted); }
+
+/* Badges */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+.badge.simple, .badge.eliminated { background: rgba(34,197,94,0.12); color: var(--green); }
+.badge.medium { background: rgba(234,179,8,0.12); color: var(--yellow); }
+.badge.complex { background: rgba(239,68,68,0.12); color: var(--red); }
+.badge.routed { background: rgba(59,130,246,0.12); color: var(--blue); }
+.badge.direct { background: rgba(148,163,184,0.08); color: var(--muted); }
+
+/* Metric Strip */
+.metric-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+.metric-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-md) 20px; }
+.metric-value { font-size: 28px; font-weight: 700; }
+.metric-value.green { color: var(--green); }
+.metric-value.blue { color: var(--blue); }
+.metric-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* Utility */
+.mono { font-family: var(--font-mono); }
+.footer { text-align: center; padding: var(--space-lg); color: var(--muted); font-size: 12px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  nav { gap: var(--space-sm); padding: 0 var(--space-md); overflow-x: auto; }
+  nav a { font-size: 13px; padding: 6px 10px; }
+  main { padding: var(--space-md); }
+}
+</style>

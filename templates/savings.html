@@ -5,31 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TokenWise Core — Savings</title>
 <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
+{% include "_base.css" %}
 <style>
-  :root {
-    --bg: #0f172a; --card-bg: #1e293b; --border: #334155;
-    --text: #e2e8f0; --muted: #94a3b8; --green: #22c55e; --blue: #3b82f6;
-    --purple: #a855f7; --red: #ef4444; --yellow: #eab308;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-  nav { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; gap: 24px; align-items: center; height: 56px; }
-  nav a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; transition: all 0.15s; }
-  nav a:hover, nav a.active { color: var(--text); background: rgba(255,255,255,0.05); }
-  nav .brand { font-weight: 700; font-size: 18px; color: var(--green); }
-  nav .lang-toggle { margin-left: auto; border: 1px solid var(--border); padding: 4px 10px; font-size: 12px; }
-  main { max-width: 700px; margin: 0 auto; padding: 32px 24px; }
-  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; }
-  .card h3 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  main { max-width: 960px; margin: 0 auto; padding: var(--space-xl) var(--space-lg); }
+
   .card .big { font-size: 36px; font-weight: 700; }
   .card .big.green { color: var(--green); }
   .card .sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
 
-  .how-it-works { margin-top: 32px; }
+  .dual-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin-bottom: var(--space-lg); }
+  .chart-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-md); }
+  .chart-box h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+
+  .how-it-works { margin-top: var(--space-xl); }
   .how-it-works h2 { font-size: 18px; margin-bottom: 12px; }
   .how-it-works p { color: var(--muted); line-height: 1.7; font-size: 14px; }
   .how-it-works code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
-  .footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 768px) { .dual-col { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body hx-boost="true">
@@ -43,35 +36,86 @@
 </nav>
 <main>
 
-  <div class="card">
-    <h3>This Month's API Cost</h3>
-    <div class="big">{{ month_cost }}</div>
-    <div class="sub">across {{ total_calls }} calls</div>
+  <!-- Top Cards -->
+  <div class="metric-strip" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="card" style="margin:0">
+      <h3>This Month's Cost</h3>
+      <div class="big">{{ month_cost }}</div>
+      <div class="sub">{{ total_calls }} calls</div>
+    </div>
+    <div class="card" style="margin:0">
+      <h3>Cache Savings</h3>
+      <div class="big green">{{ cache_saved }}</div>
+      <div class="sub">{{ cache_count }} eliminated</div>
+    </div>
+    <div class="card" style="margin:0">
+      <h3>{% if is_pro %}Total Savings{% else %}Pro Potential{% endif %}</h3>
+      <div class="big green">{{ total_saved }}</div>
+      <div class="sub">{% if is_pro %}{{ routing_count }} routed{% else %}Smart routing + cache{% endif %}</div>
+    </div>
   </div>
 
-  {% if is_pro %}
-  <div class="card">
-    <h3>Cache Savings</h3>
-    <div class="big green">{{ cache_saved }}</div>
-    <div class="sub">{{ cache_count }} responses served from cache with $0 API cost</div>
+  <!-- Charts -->
+  <div class="dual-col">
+    <div class="chart-box">
+      <h3>Cost Trend (7 Days)</h3>
+      <div id="cost-trend-chart"></div>
+    </div>
+    <div class="chart-box">
+      <h3>Model Mix</h3>
+      <div id="model-mix-chart"></div>
+    </div>
   </div>
-  <div class="card">
-    <h3>Routing Savings</h3>
-    <div class="big green">{{ routing_saved }}</div>
-    <div class="sub">{{ routing_count }} calls automatically routed to the cheapest capable model</div>
-  </div>
-  <div class="card">
-    <h3>Total Estimated Savings</h3>
-    <div class="big green">{{ total_saved }}</div>
-    <div class="sub">Combined cache + routing savings this month</div>
-  </div>
-  {% else %}
-  <div class="card">
-    <h3>Potential Savings with Pro</h3>
-    <div class="big green">{{ total_saved }}</div>
-    <div class="sub">Estimated savings from smart routing + response caching</div>
-  </div>
-  {% endif %}
+  <script>
+  (function() {
+    // Cost trend
+    var trendData = {{ cost_trend }};
+    if (trendData && trendData.length) {
+      var maxC = Math.max.apply(null, trendData) || 1;
+      var w = 360, h = 140, pad = 30;
+      var svg = '<svg width="100%" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">';
+      svg += '<line x1="' + pad + '" y1="0" x2="' + pad + '" y2="' + (h-20) + '" stroke="#334155" stroke-width="1"/>';
+      svg += '<line x1="' + pad + '" y1="' + (h-20) + '" x2="' + w + '" y2="' + (h-20) + '" stroke="#334155" stroke-width="1"/>';
+      var pts = '';
+      var step = (w - pad - 10) / (trendData.length - 1);
+      for (var i = 0; i < trendData.length; i++) {
+        var x = pad + i * step;
+        var y = (h - 20) - (trendData[i] / maxC) * (h - 40);
+        pts += (i ? ' L ' : 'M ') + x.toFixed(1) + ' ' + y.toFixed(1);
+      }
+      svg += '<path d="' + pts + '" fill="none" stroke="#22c55e" stroke-width="2" opacity="0.8"/>';
+      for (var i = 0; i < trendData.length; i++) {
+        var x = pad + i * step;
+        var y = (h - 20) - (trendData[i] / maxC) * (h - 40);
+        svg += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3" fill="#22c55e"/>';
+      }
+      svg += '</svg>';
+      document.getElementById('cost-trend-chart').innerHTML = svg;
+    } else {
+      document.getElementById('cost-trend-chart').innerHTML = '<p style="color:var(--muted);font-size:13px;padding:20px">No data yet</p>';
+    }
+
+    // Model mix pie chart (simplified bar chart)
+    var models = {{ chart_models }};
+    var costs = {{ chart_costs }};
+    if (models && models.length) {
+      var total = costs.reduce(function(a,b){return a+b;}, 0) || 1;
+      var colors = ['#22c55e','#3b82f6','#a855f7','#eab308','#ef4444','#94a3b8'];
+      var html = '';
+      for (var i = 0; i < models.length; i++) {
+        var pct = (costs[i] / total * 100).toFixed(0);
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px">';
+        html += '<span style="width:10px;height:10px;border-radius:2px;background:' + colors[i%6] + ';flex-shrink:0"></span>';
+        html += '<span style="flex:1;color:var(--text)">' + models[i] + '</span>';
+        html += '<span style="color:var(--muted)">$' + costs[i].toFixed(4) + ' (' + pct + '%)</span>';
+        html += '</div>';
+      }
+      document.getElementById('model-mix-chart').innerHTML = html;
+    } else {
+      document.getElementById('model-mix-chart').innerHTML = '<p style="color:var(--muted);font-size:13px;padding:20px">No data yet</p>';
+    }
+  })();
+  </script>
 
   <div class="how-it-works">
     <h2>How TokenWise Core Saves You Money</h2>

@@ -5,20 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TokenWise Core — Execution Layer</title>
 <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
+{% include "_base.css" %}
 <style>
-  :root {
-    --bg: #0f172a; --card-bg: #1e293b; --border: #334155;
-    --text: #e2e8f0; --muted: #94a3b8; --green: #22c55e; --blue: #3b82f6;
-    --purple: #a855f7; --red: #ef4444; --yellow: #eab308;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-  nav { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; gap: 24px; align-items: center; height: 56px; }
-  nav a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; transition: all 0.15s; }
-  nav a:hover, nav a.active { color: var(--text); background: rgba(255,255,255,0.05); }
-  nav .brand { font-weight: 700; font-size: 18px; color: var(--green); }
-  nav .lang-toggle { margin-left: auto; border: 1px solid var(--border); padding: 4px 10px; font-size: 12px; }
-  main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+  main { max-width: 960px; margin: 0 auto; padding: var(--space-xl) var(--space-lg); }
 
   /* Hero */
   .hero { text-align: center; padding: 28px 0 32px; }
@@ -26,59 +15,64 @@
   .hero-label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
   .hero-sub { font-size: 14px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
 
-  /* Story Cards */
-  .story-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 32px; }
-  .story-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; display: flex; gap: 14px; align-items: flex-start; }
-  .story-icon { font-size: 22px; flex-shrink: 0; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.04); border-radius: 8px; }
-  .story-body { flex: 1; min-width: 0; }
-  .story-value { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.2; }
-  .story-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .story-sub { font-size: 12px; color: var(--green); margin-top: 4px; font-weight: 500; }
+  /* Metric Strip */
+  .metric-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+  .metric-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-md) 20px; }
+  .metric-value { font-size: 28px; font-weight: 700; }
+  .metric-value.green { color: var(--green); }
+  .metric-value.blue { color: var(--blue); }
+  .metric-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* Dual Column */
+  .dual-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin-bottom: var(--space-lg); }
+  .col-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-md) 20px; }
+  .col-card h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
 
   /* Chart */
-  .chart-section { margin-bottom: 28px; }
-  .chart-title { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
-  .chart-container { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 10px 10px; overflow-x: auto; }
-  .chart-container svg { display: block; min-width: 500px; }
+  .chart-container { overflow-x: auto; }
+  .chart-container svg { display: block; min-width: 400px; }
 
   /* Upgrade CTA */
-  .upgrade-cta { background: linear-gradient(135deg, rgba(34,197,94,0.08), rgba(59,130,246,0.08)); border: 1px solid rgba(34,197,94,0.2); border-radius: 10px; padding: 16px 20px; margin-bottom: 28px; display: flex; align-items: center; gap: 16px; }
+  .upgrade-cta { background: linear-gradient(135deg, rgba(34,197,94,0.08), rgba(59,130,246,0.08)); border: 1px solid rgba(34,197,94,0.2); border-radius: var(--radius-lg); padding: var(--space-md) 20px; margin-bottom: var(--space-lg); display: flex; align-items: center; gap: var(--space-md); }
   .upgrade-cta .cta-text { flex: 1; font-size: 14px; color: var(--text); }
-  .upgrade-cta .cta-btn { background: var(--green); color: #000; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 13px; text-decoration: none; white-space: nowrap; }
+  .upgrade-cta .cta-btn { background: var(--green); color: #000; padding: var(--space-sm) var(--space-md); border-radius: 6px; font-weight: 600; font-size: 13px; text-decoration: none; white-space: nowrap; }
 
-  /* Request Log (terminal style) */
-  .log-section { margin-bottom: 32px; }
+  /* Request Log */
+  .log-section { margin-bottom: var(--space-xl); }
   .log-title { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
-  .log-list { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; font-size: 13px; }
-  .log-line { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .log-list { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; font-family: var(--font-mono); font-size: 13px; }
+  .log-line { display: flex; align-items: center; gap: 10px; padding: var(--space-sm) 14px; border-bottom: 1px solid var(--border); color: var(--muted); }
   .log-line:last-child { border-bottom: none; }
   .log-model { color: var(--text); font-weight: 600; min-width: 140px; }
-  .log-decision { font-size: 12px; padding: 2px 8px; border-radius: 99px; font-weight: 600; white-space: nowrap; }
+  .log-decision { font-size: 12px; padding: 2px var(--space-sm); border-radius: 99px; font-weight: 600; white-space: nowrap; }
   .log-decision.eliminated { background: rgba(34,197,94,0.12); color: var(--green); }
   .log-decision.routed { background: rgba(59,130,246,0.12); color: var(--blue); }
   .log-decision.direct { background: rgba(148,163,184,0.08); color: var(--muted); }
   .log-cost { color: var(--text); min-width: 80px; text-align: right; }
   .log-ago { color: var(--muted); font-size: 12px; margin-left: auto; }
-  .log-empty { padding: 24px; text-align: center; color: var(--muted); font-family: inherit; font-size: 13px; }
+  .log-empty { padding: var(--space-lg); text-align: center; color: var(--muted); font-family: inherit; font-size: 13px; }
 
   /* FAQ */
   .faq-section { margin-top: 44px; padding-top: 28px; border-top: 1px solid var(--border); }
   .faq-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
-  .faq-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; }
-  .faq-item summary { padding: 13px 16px; font-size: 14px; font-weight: 500; cursor: pointer; user-select: none; list-style: none; color: var(--text); display: flex; justify-content: space-between; align-items: center; }
+  .faq-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; }
+  .faq-item summary { padding: 13px var(--space-md); font-size: 14px; font-weight: 500; cursor: pointer; user-select: none; list-style: none; color: var(--text); display: flex; justify-content: space-between; align-items: center; }
   .faq-item summary::-webkit-details-marker { display: none; }
   .faq-item summary::after { content: '+'; font-size: 18px; color: var(--muted); flex-shrink: 0; margin-left: 12px; }
   .faq-item[open] summary::after { content: '\2212'; }
   .faq-item summary:hover { background: rgba(255,255,255,0.02); }
-  .faq-item p { padding: 0 16px 14px; font-size: 13px; color: var(--muted); line-height: 1.65; }
+  .faq-item p { padding: 0 var(--space-md) 14px; font-size: 13px; color: var(--muted); line-height: 1.65; }
   .faq-item code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
 
-  .footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px; }
-
   /* Budget Banner */
-  .budget-warning { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: var(--yellow); display: flex; align-items: center; gap: 10px; line-height: 1.4; }
-  .budget-warning .icon { font-size: 18px; flex-shrink: 0; }
+  .budget-warning { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); border-radius: var(--radius); padding: 12px var(--space-md); margin-bottom: var(--space-md); font-size: 13px; color: var(--yellow); display: flex; align-items: center; gap: 10px; line-height: 1.4; }
   .budget-critical { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: var(--red); }
+
+  @media (max-width: 768px) {
+    .metric-strip { grid-template-columns: repeat(2, 1fr); }
+    .dual-col { grid-template-columns: 1fr; }
+    .hero-value { font-size: 40px; }
+  }
 </style>
 </head>
 <body hx-boost="true">
@@ -96,82 +90,83 @@
   <div id="budget-banner" hx-get="/api/budget-banner" hx-trigger="every 60s" hx-swap="innerHTML"></div>
 
   <!-- Hero -->
-  {% if is_pro && savings_pct != "N/A" %}
   <div class="hero">
-    <div class="hero-label">Lossless Cost Reduction</div>
-    <div class="hero-value">{{ savings_pct }}</div>
-    <div class="hero-sub">Same task quality &middot; lower model cost &middot; {{ total_calls }} requests</div>
-  </div>
-  {% else %}
-  <div class="hero">
-    <div class="hero-label">This Month</div>
-    <div class="hero-value" style="color:var(--text)">{{ month_cost }}</div>
+    <div class="hero-label">{% if is_pro && savings_pct != "N/A" %}Lossless Cost Reduction{% else %}This Month{% endif %}</div>
+    <div class="hero-value" {% if !is_pro || savings_pct == "N/A" %}style="color:var(--text)"{% endif %}>{% if is_pro && savings_pct != "N/A" %}{{ savings_pct }}{% else %}{{ month_cost }}{% endif %}</div>
     <div class="hero-sub">{{ total_calls }} requests processed</div>
   </div>
-  {% endif %}
 
-  <!-- Story Cards -->
-  <div class="story-grid">
-    <div class="story-card">
-      <div class="story-icon">&#9889;</div>
-      <div class="story-body">
-        <div class="story-value">{{ cache_count }}</div>
-        <div class="story-label">Requests Eliminated &mdash; $0 execution</div>
-        {% if is_pro && cache_saved != "$0.000000" %}
-        <div class="story-sub">saved {{ cache_saved }}</div>
-        {% endif %}
-      </div>
+  <!-- Metric Strip -->
+  <div class="metric-strip">
+    <div class="metric-card">
+      <div class="metric-value">{{ month_cost }}</div>
+      <div class="metric-label">Total Cost</div>
     </div>
-    <div class="story-card">
-      <div class="story-icon">&#128259;</div>
-      <div class="story-body">
-        <div class="story-value">{{ routing_count }}</div>
-        <div class="story-label">Execution Decisions &mdash; cheaper model, same task</div>
-        {% if is_pro && routing_count > 0 %}
-        <div class="story-sub">~{{ routing_saved }} saved</div>
-        {% endif %}
-      </div>
+    <div class="metric-card">
+      <div class="metric-value green">{{ cache_count }}</div>
+      <div class="metric-label">Eliminated · $0</div>
     </div>
-    <div class="story-card">
-      <div class="story-icon">&#128200;</div>
-      <div class="story-body">
-        <div class="story-value">{{ distinct_models }}</div>
-        <div class="story-label">Execution Layer &mdash; models under automatic selection</div>
-        <div class="story-sub">zero code changes</div>
-      </div>
+    <div class="metric-card">
+      <div class="metric-value blue">{{ routing_count }}</div>
+      <div class="metric-label">Routed · Cheaper Model</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">{{ distinct_models }}</div>
+      <div class="metric-label">Models Active</div>
     </div>
   </div>
 
-  <!-- Token Cost Chart (inline SVG) -->
-  {% if chart_models != "[]" && chart_models != "" %}
-  <div class="chart-section">
-    <div class="chart-title">Spend by Model (this month)</div>
-    <div id="token-chart" class="chart-container"></div>
+  <!-- Dual Column: Chart + Recent Activity -->
+  <div class="dual-col">
+    {% if chart_models != "[]" && chart_models != "" %}
+    <div class="col-card">
+      <h3>Spend by Model</h3>
+      <div id="token-chart" class="chart-container"></div>
+    </div>
+    <script>
+    (function() {
+      var models = {{ chart_models }};
+      var costs = {{ chart_costs }};
+      var maxCost = {{ chart_max_cost }};
+      if (!models.length) return;
+      var h = models.length * 36 + 20, barH = 28, gap = 8;
+      var padL = 120, padR = 70;
+      var svg = '<svg width="100%" height="' + h + '" viewBox="0 0 400 ' + h + '" xmlns="http://www.w3.org/2000/svg">';
+      var scale = maxCost > 0 ? (400 - padL - padR) / maxCost : 1;
+      for (var i = 0; i < models.length; i++) {
+        var y = i * (barH + gap) + 10;
+        var bw = Math.max(costs[i] * scale, 2);
+        var pct = maxCost > 0 ? (costs[i] / maxCost * 100).toFixed(0) : 0;
+        var hue = 200 - (pct * 1.2);
+        svg += '<text x="' + (padL - 6) + '" y="' + (y + barH - 8) + '" text-anchor="end" fill="#94a3b8" font-size="10" font-family="inherit">' + models[i] + '</text>';
+        svg += '<rect x="' + padL + '" y="' + y + '" width="' + bw + '" height="' + barH + '" rx="4" fill="hsl(' + hue + ', 70%, 55%)" opacity="0.85"/>';
+        svg += '<text x="' + (padL + bw + 4) + '" y="' + (y + barH - 8) + '" fill="#e2e8f0" font-size="10" font-family="inherit">$' + costs[i].toFixed(4) + '</text>';
+      }
+      svg += '</svg>';
+      document.getElementById('token-chart').innerHTML = svg;
+    })();
+    </script>
+    {% endif %}
+
+    <!-- Recent Activity -->
+    <div class="col-card">
+      <h3>Recent Activity</h3>
+      <div class="log-list">
+        {% if recent_calls.is_empty() %}
+        <div class="log-empty">Point your app to <code>http://127.0.0.1:9401/v1</code> and send your first request</div>
+        {% else %}
+        {% for call in recent_calls %}
+        <div class="log-line">
+          <span class="log-model">{{ call.model }}</span>
+          <span class="log-decision {{ call.decision }}">{{ call.decision_label }}</span>
+          <span class="log-cost">{{ call.cost }}</span>
+          <span class="log-ago">{{ call.ago }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+    </div>
   </div>
-  <script>
-  (function() {
-    var models = {{ chart_models }};
-    var costs = {{ chart_costs }};
-    var maxCost = {{ chart_max_cost }};
-    if (!models.length) return;
-    var w = 860, h = models.length * 36 + 20, barH = 28, gap = 8;
-    var padL = 130, padR = 80;
-    var svg = '<svg width="100%" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">';
-    var scale = maxCost > 0 ? (w - padL - padR) / maxCost : 1;
-    for (var i = 0; i < models.length; i++) {
-      var y = i * (barH + gap) + 10;
-      var bw = Math.max(costs[i] * scale, 2);
-      var pct = maxCost > 0 ? (costs[i] / maxCost * 100).toFixed(0) : 0;
-      var hue = 200 - (pct * 1.2);
-      svg += '<text x="' + (padL - 6) + '" y="' + (y + barH - 8) + '" text-anchor="end" fill="#94a3b8" font-size="11" font-family="inherit">' + models[i] + '</text>';
-      svg += '<rect x="' + padL + '" y="' + y + '" width="' + bw + '" height="' + barH + '" rx="4" fill="hsl(' + hue + ', 70%, 55%)" opacity="0.85"/>';
-      svg += '<text x="' + (padL + bw + 6) + '" y="' + (y + barH - 8) + '" fill="#e2e8f0" font-size="11" font-family="inherit">$' + costs[i].toFixed(4) + '</text>';
-    }
-    svg += '</svg>';
-    document.getElementById('token-chart').innerHTML = svg;
-  })();
-  </script>
-  {% endif %}
 
   {% if !is_pro %}
   <div class="upgrade-cta">
@@ -182,24 +177,6 @@
   </div>
   {% endif %}
 
-  <!-- Request Log (terminal style) -->
-  <div class="log-section">
-    <div class="log-title">Request Log</div>
-    {% if recent_calls.is_empty() %}
-    <div class="log-list"><div class="log-empty">Execution layer ready &mdash; point your app to <code>http://127.0.0.1:9401/v1</code> and send your first request</div></div>
-    {% else %}
-    <div class="log-list">
-      {% for call in recent_calls %}
-      <div class="log-line">
-        <span class="log-model">{{ call.model }}</span>
-        <span class="log-decision {{ call.decision }}">{{ call.decision_label }}</span>
-        <span class="log-cost">{{ call.cost }}</span>
-        <span class="log-ago">{{ call.ago }}</span>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-  </div>
 
   <!-- Try It (collapsible) -->
   {{ chat_widget|safe }}
