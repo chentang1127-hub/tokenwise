@@ -46,7 +46,7 @@
 |------|---------|
 | 6/23 | F1 完成：Telegram Bot 通知（预算告警/超限/日报推送 TG） |
 | 6/23 | F2 确认：数据导出 CSV/JSON 早已存在，验证通过 |
-| 6/23 | B 任务全部完成：e2e 测试脚本、旁路开关、长会话压力测试、DELIVERY.md、nginx body size |
+| 6/23 | TLS/HTTPS：acme.sh + Cloudflare DNS wildcard 证书，8443 端口，Dashboard + Proxy 全部 HTTPS |
 | 6/23 | 🚀 生产部署：getipgeo.com VPS 上线，systemd 服务，nginx 反代 |
 | 6/22 | P5 全部完成：Try It 流式响应、用量告警、数据导出、多 Key 管理、Settings 页面 |
 | 6/21 | P3+P4 完成：Docker 部署、systemd、env override、Backup/Status CLI |
@@ -94,7 +94,10 @@ cargo run --release -- status                # 查看运行状态
 | 项目 | 详情 |
 |------|------|
 | VPS | 144.34.180.112 (AlmaLinux 9.7) |
-| Dashboard | http://tw.getipgeo.com |
+| Dashboard (HTTP) | http://tw.getipgeo.com |
+| Dashboard (HTTPS) | https://tw.getipgeo.com:8443 |
+| Proxy (HTTP) | http://llm.getipgeo.com/v1 |
+| Proxy (HTTPS) | https://llm.getipgeo.com:8443/v1 |
 | Proxy | http://llm.getipgeo.com/v1 |
 | 运行方式 | systemd (`systemctl status tokenwise`) |
 | 配置文件 | `/opt/tokenwise/config.yaml` |
