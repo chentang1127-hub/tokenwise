@@ -98,7 +98,6 @@ cargo run --release -- status                # 查看运行状态
 | Dashboard (HTTPS) | https://tw.getipgeo.com:8443 |
 | Proxy (HTTP) | http://llm.getipgeo.com/v1 |
 | Proxy (HTTPS) | https://llm.getipgeo.com:8443/v1 |
-| Proxy | http://llm.getipgeo.com/v1 |
 | 运行方式 | systemd (`systemctl status tokenwise`) |
 | 配置文件 | `/opt/tokenwise/config.yaml` |
 | 数据库 | `/opt/tokenwise/tokenwise.db` |
@@ -108,10 +107,11 @@ cargo run --release -- status                # 查看运行状态
 ### VPS 组件一览
 
 ```
-:80   → nginx (Docker)     → getipgeo.com, api.getipgeo.com, tw/llm.getipgeo.com
+:80   → nginx (Docker)     → getipgeo.com, api.getipgeo.com, tw/llm HTTP
 :443  → ssserver (systemd)  → Shadowsocks，不动
-:9400 → tokenwise (systemd) → Dashboard（仅 localhost，通过 nginx 反代）
-:9401 → tokenwise (systemd) → Proxy（仅 localhost，通过 nginx 反代）
+:8443 → nginx (Docker)     → tw/llm HTTPS (TLS via acme.sh)
+:9400 → tokenwise (systemd) → Dashboard（仅 localhost）
+:9401 → tokenwise (systemd) → Proxy（仅 localhost）
 ```
 
 ### 更新 TokenWise
