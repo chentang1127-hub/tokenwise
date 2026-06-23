@@ -188,7 +188,6 @@ impl ProxyService {
         // this request. TokenWise still translates formats (Anthropic↔OpenAI)
         // but skips routing, caching, and fallback.
         let routing_enabled = self.routing_enabled && !self.cfg.proxy.bypass;
-        let cache_enabled = routing_enabled; // cache requires Pro routing
         let safety_enabled = self.cfg.safety_net.enabled && !self.cfg.proxy.bypass;
 
         // Budget check: block requests if daily/monthly limit exceeded
