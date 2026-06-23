@@ -83,7 +83,7 @@
   <!-- Webhook Config -->
   <div class="card">
     <h3>Webhook Notifications</h3>
-    <p class="card-desc">Get alerts when budgets are approaching or exceeded. Requires restart after saving. Supports Slack, Discord, and any HTTP webhook endpoint.</p>
+    <p class="card-desc">Get alerts when budgets are approaching or exceeded. Supports Slack, Discord, Telegram, and any HTTP webhook endpoint. Requires restart after saving.</p>
 
     <div class="settings-field" style="margin-bottom:14px;">
       <label for="webhook-url">Webhook URL</label>
@@ -104,6 +104,19 @@
           <input type="checkbox" id="webhook-anomaly" {% if webhook_anomaly %}checked{% endif %} />
           <span>Anomaly Detection</span>
         </label>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 20px; font-size: 14px;">Telegram Alerts</h3>
+    <p class="card-desc">Send alerts directly to Telegram. Get a bot token from <a href="https://t.me/BotFather" target="_blank" style="color: var(--blue);">@BotFather</a>, then start a chat with your bot to get the chat ID.</p>
+    <div class="settings-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="settings-field">
+        <label for="tg-bot-token">Bot Token</label>
+        <input type="text" id="tg-bot-token" class="settings-input" value="{{ tg_bot_token }}" placeholder="123456:ABC-DEF..." />
+      </div>
+      <div class="settings-field">
+        <label for="tg-chat-id">Chat ID</label>
+        <input type="text" id="tg-chat-id" class="settings-input" value="{{ tg_chat_id }}" placeholder="123456789" />
       </div>
     </div>
 
@@ -156,6 +169,8 @@ async function saveWebhookConfig() {
         budget_warning_pct: parseFloat(document.getElementById('webhook-pct').value) / 100.0,
         cooldown_secs: parseInt(document.getElementById('webhook-cooldown').value),
         anomaly_detection: document.getElementById('webhook-anomaly').checked,
+        tg_bot_token: document.getElementById('tg-bot-token').value,
+        tg_chat_id: document.getElementById('tg-chat-id').value,
       }),
     });
     var data = await resp.json();

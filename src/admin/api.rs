@@ -177,6 +177,8 @@ struct SettingsTemplate {
     webhook_warning_pct: String,
     webhook_cooldown_secs: String,
     webhook_anomaly: bool,
+    tg_bot_token: String,
+    tg_chat_id: String,
     lang_toggle_label: &'static str,
     lang_toggle_url: &'static str,
     version: &'static str,
@@ -191,6 +193,8 @@ struct SettingsTemplateCn {
     webhook_warning_pct: String,
     webhook_cooldown_secs: String,
     webhook_anomaly: bool,
+    tg_bot_token: String,
+    tg_chat_id: String,
     lang_toggle_label: &'static str,
     lang_toggle_url: &'static str,
     version: &'static str,
@@ -1048,6 +1052,8 @@ async fn settings_page(
             webhook_warning_pct,
             webhook_cooldown_secs,
             webhook_anomaly: state.config.webhook.anomaly_detection,
+            tg_bot_token: state.config.webhook.tg_bot_token.clone(),
+            tg_chat_id: state.config.webhook.tg_chat_id.clone(),
             lang_toggle_label,
             lang_toggle_url,
             version: env!("CARGO_PKG_VERSION"),
@@ -1064,6 +1070,8 @@ async fn settings_page(
             webhook_warning_pct,
             webhook_cooldown_secs,
             webhook_anomaly: state.config.webhook.anomaly_detection,
+            tg_bot_token: state.config.webhook.tg_bot_token.clone(),
+            tg_chat_id: state.config.webhook.tg_chat_id.clone(),
             lang_toggle_label,
             lang_toggle_url,
             version: env!("CARGO_PKG_VERSION"),
@@ -1103,6 +1111,8 @@ async fn get_webhook_config(State(state): State<Arc<AppState>>) -> Json<serde_js
         "budget_warning_pct": state.config.webhook.budget_warning_pct,
         "cooldown_secs": state.config.webhook.cooldown_secs,
         "anomaly_detection": state.config.webhook.anomaly_detection,
+        "tg_bot_token": state.config.webhook.tg_bot_token,
+        "tg_chat_id": state.config.webhook.tg_chat_id,
     }))
 }
 
@@ -1112,6 +1122,8 @@ struct WebhookConfigPayload {
     budget_warning_pct: Option<f64>,
     cooldown_secs: Option<u64>,
     anomaly_detection: Option<bool>,
+    tg_bot_token: Option<String>,
+    tg_chat_id: Option<String>,
 }
 
 /// POST /api/webhook-config — save webhook configuration to config.yaml.
@@ -1129,6 +1141,12 @@ async fn save_webhook_config(
     }
     if let Some(anomaly) = body.anomaly_detection {
         cfg.webhook.anomaly_detection = anomaly;
+    }
+    if let Some(tg_token) = body.tg_bot_token {
+        cfg.webhook.tg_bot_token = tg_token;
+    }
+    if let Some(tg_chat) = body.tg_chat_id {
+        cfg.webhook.tg_chat_id = tg_chat;
     }
 
     match cfg.save(&state.config_path) {

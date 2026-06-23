@@ -107,6 +107,19 @@
       </div>
     </div>
 
+    <h3 style="margin-top: 20px; font-size: 14px;">Telegram 告警</h3>
+    <p class="card-desc">直接发告警到 Telegram。从 <a href="https://t.me/BotFather" target="_blank" style="color: var(--blue);">@BotFather</a> 获取 Bot Token，然后给你的 Bot 发一条消息即可获取 Chat ID。</p>
+    <div class="settings-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="settings-field">
+        <label for="tg-bot-token">Bot Token</label>
+        <input type="text" id="tg-bot-token" class="settings-input" value="{{ tg_bot_token }}" placeholder="123456:ABC-DEF..." />
+      </div>
+      <div class="settings-field">
+        <label for="tg-chat-id">Chat ID</label>
+        <input type="text" id="tg-chat-id" class="settings-input" value="{{ tg_chat_id }}" placeholder="123456789" />
+      </div>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-primary" onclick="saveWebhookConfig()">保存 Webhook 配置</button>
       <button class="btn btn-outline" onclick="testWebhook()">发送测试</button>
@@ -156,6 +169,8 @@ async function saveWebhookConfig() {
         budget_warning_pct: parseFloat(document.getElementById('webhook-pct').value) / 100.0,
         cooldown_secs: parseInt(document.getElementById('webhook-cooldown').value),
         anomaly_detection: document.getElementById('webhook-anomaly').checked,
+        tg_bot_token: document.getElementById('tg-bot-token').value,
+        tg_chat_id: document.getElementById('tg-chat-id').value,
       }),
     });
     var data = await resp.json();

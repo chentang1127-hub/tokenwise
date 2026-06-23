@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookConfig {
     /// Webhook URL to POST to (e.g., Slack, Discord, custom endpoint).
+    #[serde(default)]
     pub url: String,
     /// Budget warning threshold (0.0–1.0). Fire when spending reaches
     /// this fraction of the limit. Default 0.80 = 80%.
@@ -25,6 +26,12 @@ pub struct WebhookConfig {
     /// Enable anomaly detection (spending spike alerts).
     #[serde(default)]
     pub anomaly_detection: bool,
+    /// Telegram Bot token (from @BotFather). Leave empty to disable TG alerts.
+    #[serde(default)]
+    pub tg_bot_token: String,
+    /// Telegram chat ID to send alerts to.
+    #[serde(default)]
+    pub tg_chat_id: String,
 }
 
 fn default_warning_threshold() -> f64 {
@@ -41,6 +48,8 @@ impl Default for WebhookConfig {
             budget_warning_pct: 0.80,
             cooldown_secs: 3600,
             anomaly_detection: false,
+            tg_bot_token: String::new(),
+            tg_chat_id: String::new(),
         }
     }
 }
@@ -92,9 +101,9 @@ pub struct WebhookDispatcher {
 }
 
 impl WebhookDispatcher {
-    /// Create a new dispatcher. Returns None if no URL is configured.
+    /// Create a new dispatcher. Returns None if no webhook URL or TG bot is configured.
     pub fn new(config: WebhookConfig) -> Option<Self> {
-        if config.url.is_empty() {
+        if config.url.is_empty() && config.tg_bot_token.is_empty() {
             return None;
         }
         Some(Self {
@@ -125,25 +134,25 @@ impl WebhookDispatcher {
             let pct = spent_today / daily_limit;
             if pct >= 1.0 && now - self.last_budget_exceeded_daily > cooldown {
                 self.last_budget_exceeded_daily = now;
-                let _ = self
-                    .send(WebhookEvent::BudgetExceeded {
-                        scope: "daily".into(),
-                        spent: spent_today,
-                        limit: daily_limit,
-                    })
-                    .await;
+                let event = WebhookEvent::BudgetExceeded {
+                    scope: "daily".into(),
+                    spent: spent_today,
+                    limit: daily_limit,
+                };
+                let _ = self.send(event.clone()).await;
+                self.notify_telegram(&event).await;
             } else if pct >= self.config.budget_warning_pct
                 && now - self.last_budget_warning_daily > cooldown
             {
                 self.last_budget_warning_daily = now;
-                let _ = self
-                    .send(WebhookEvent::BudgetWarning {
-                        scope: "daily".into(),
-                        spent: spent_today,
-                        limit: daily_limit,
-                        pct: pct * 100.0,
-                    })
-                    .await;
+                let event = WebhookEvent::BudgetWarning {
+                    scope: "daily".into(),
+                    spent: spent_today,
+                    limit: daily_limit,
+                    pct: pct * 100.0,
+                };
+                let _ = self.send(event.clone()).await;
+                self.notify_telegram(&event).await;
             }
         }
 
@@ -152,25 +161,25 @@ impl WebhookDispatcher {
             let pct = spent_month / monthly_limit;
             if pct >= 1.0 && now - self.last_budget_exceeded_monthly > cooldown {
                 self.last_budget_exceeded_monthly = now;
-                let _ = self
-                    .send(WebhookEvent::BudgetExceeded {
-                        scope: "monthly".into(),
-                        spent: spent_month,
-                        limit: monthly_limit,
-                    })
-                    .await;
+                let event = WebhookEvent::BudgetExceeded {
+                    scope: "monthly".into(),
+                    spent: spent_month,
+                    limit: monthly_limit,
+                };
+                let _ = self.send(event.clone()).await;
+                self.notify_telegram(&event).await;
             } else if pct >= self.config.budget_warning_pct
                 && now - self.last_budget_warning_monthly > cooldown
             {
                 self.last_budget_warning_monthly = now;
-                let _ = self
-                    .send(WebhookEvent::BudgetWarning {
-                        scope: "monthly".into(),
-                        spent: spent_month,
-                        limit: monthly_limit,
-                        pct: pct * 100.0,
-                    })
-                    .await;
+                let event = WebhookEvent::BudgetWarning {
+                    scope: "monthly".into(),
+                    spent: spent_month,
+                    limit: monthly_limit,
+                    pct: pct * 100.0,
+                };
+                let _ = self.send(event.clone()).await;
+                self.notify_telegram(&event).await;
             }
         }
     }
@@ -193,17 +202,17 @@ impl WebhookDispatcher {
             return false;
         }
         self.last_usage_report_date = today.clone();
-        let _ = self
-            .send(WebhookEvent::UsageReport {
-                date: today,
-                total_calls,
-                total_cost,
-                total_prompt_tokens,
-                total_completion_tokens,
-                cache_hits,
-                routed_calls,
-            })
-            .await;
+        let event = WebhookEvent::UsageReport {
+            date: today,
+            total_calls,
+            total_cost,
+            total_prompt_tokens,
+            total_completion_tokens,
+            cache_hits,
+            routed_calls,
+        };
+        let _ = self.send(event.clone()).await;
+        self.notify_telegram(&event).await;
         true
     }
 
@@ -227,5 +236,64 @@ impl WebhookDispatcher {
 
         tracing::info!("Webhook sent: {:?}", event);
         Ok(())
+    }
+
+    /// Send a message via Telegram Bot API.
+    async fn send_telegram(&self, text: &str) -> bool {
+        if self.config.tg_bot_token.is_empty() || self.config.tg_chat_id.is_empty() {
+            return false;
+        }
+        let url = format!(
+            "https://api.telegram.org/bot{}/sendMessage",
+            self.config.tg_bot_token
+        );
+        let payload = serde_json::json!({
+            "chat_id": self.config.tg_chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": true,
+        });
+        match reqwest::Client::new()
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_vec(&payload).unwrap_or_default())
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                if resp.status().is_success() {
+                    tracing::info!("TG sent");
+                    true
+                } else {
+                    tracing::warn!("TG fail {}", resp.status());
+                    false
+                }
+            }
+            Err(e) => {
+                tracing::warn!("TG error: {e}");
+                false
+            }
+        }
+    }
+
+    /// Send an event via Telegram if configured.
+    pub async fn notify_telegram(&self, event: &WebhookEvent) {
+        let text = match event {
+            WebhookEvent::BudgetWarning { scope, spent, limit, pct } => {
+                format!("⚠️ Budget Warning ({scope}): ${spent:.2}/${limit:.2} ({pct:.0}%)")
+            }
+            WebhookEvent::BudgetExceeded { scope, spent, limit } => {
+                format!("🚫 Budget EXCEEDED ({scope}): ${spent:.2}/${limit:.2}")
+            }
+            WebhookEvent::AnomalyDetected { message, current_cost, avg_cost } => {
+                format!("🔴 Anomaly: {message}\nCurrent ${current_cost:.4} vs avg ${avg_cost:.4}")
+            }
+            WebhookEvent::UsageReport { date, total_calls, total_cost, total_prompt_tokens, total_completion_tokens, cache_hits, routed_calls } => {
+                format!(
+                    "📊 Daily Report {date}\nCalls: {total_calls} | Cost: ${total_cost:.4}\nTokens: {total_prompt_tokens}/{total_completion_tokens} | Cache: {cache_hits} | Routed: {routed_calls}"
+                )
+            }
+        };
+        self.send_telegram(&text).await;
     }
 }
