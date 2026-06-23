@@ -20,6 +20,7 @@ fn test_config() -> tokenwise::config::Config {
             listen: "127.0.0.1:9401".to_string(),
             admin: "127.0.0.1:9400".to_string(),
             timeout_secs: 10,
+            bypass: false,
         },
         providers: vec![tokenwise::config::ProviderConfig {
             name: "deepseek".into(),

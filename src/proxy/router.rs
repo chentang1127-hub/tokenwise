@@ -148,6 +148,7 @@ mod tests {
                 listen: "127.0.0.1:9401".into(),
                 admin: "127.0.0.1:9400".into(),
                 timeout_secs: 120,
+                bypass: false,
             },
             providers: vec![
                 ProviderConfig {

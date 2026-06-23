@@ -39,6 +39,10 @@ pub struct ProxyConfig {
     pub listen: String,
     pub admin: String,
     pub timeout_secs: u64,
+    /// Bypass mode: pure transparent proxy, no translation/routing/caching.
+    /// Enable this if TokenWise causes issues — it becomes a dumb pipe.
+    #[serde(default)]
+    pub bypass: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

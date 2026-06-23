@@ -183,6 +183,13 @@ impl ProxyService {
             ));
         };
 
+        // ── Bypass mode: pure transparent passthrough ──────────
+        // When enabled, skip ALL smart logic (routing, caching, translation).
+        // TokenWise becomes a dumb pipe — forwards request and response as-is.
+        if self.cfg.proxy.bypass {
+            return Ok(self.handle_bypass(req, &path, force_provider).await);
+        }
+
         // Budget check: block requests if daily/monthly limit exceeded
         if self.cfg.budget.daily_limit_usd > 0.0 || self.cfg.budget.monthly_limit_usd > 0.0 {
             let now = chrono::Utc::now();
@@ -931,6 +938,122 @@ impl ProxyService {
                 .unwrap();
             Self::add_cors_headers(&mut resp);
             Ok(resp)
+        }
+    }
+
+    /// Bypass mode handler — pure transparent proxy.
+    /// No format translation, no routing, no caching. Just forward and return.
+    async fn handle_bypass(
+        &self,
+        req: Request<Incoming>,
+        path: &str,
+        force_provider: Option<String>,
+    ) -> Response<BoxBody<Bytes, String>> {
+        // Extract auth
+        let client_auth = req
+            .headers()
+            .get("Authorization")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string())
+            .or_else(|| {
+                req.headers()
+                    .get("x-api-key")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| format!("Bearer {s}"))
+            });
+
+        // Collect body
+        let (_parts, body) = req.into_parts();
+        let body_bytes = match body.collect().await {
+            Ok(c) => c.to_bytes(),
+            Err(e) => {
+                return Self::error_response(
+                    StatusCode::BAD_REQUEST,
+                    &format!("Failed to read body: {e}"),
+                );
+            }
+        };
+
+        // Determine provider
+        let provider_name = if let Some(ref fp) = force_provider {
+            fp.clone()
+        } else if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&body_bytes)
+            && let Some(model) = json.get("model").and_then(|v| v.as_str())
+        {
+            // Look up provider by model name
+            self.cfg
+                .providers
+                .iter()
+                .find(|p| p.models.iter().any(|m| m.id == model))
+                .map(|p| p.name.clone())
+                .unwrap_or_else(|| self.cfg.providers.first().unwrap().name.clone())
+        } else {
+            self.cfg.providers.first().unwrap().name.clone()
+        };
+
+        let base_url = self
+            .cfg
+            .providers
+            .iter()
+            .find(|p| p.name == provider_name)
+            .map(|p| p.base_url.clone())
+            .unwrap_or_else(|| "https://api.deepseek.com/v1".to_string());
+
+        // Build upstream path: strip /v1/ and optional provider prefix
+        let upstream_path = if let Some(ref fp) = force_provider {
+            path.strip_prefix(&format!("/v1/{fp}"))
+                .or_else(|| path.strip_prefix("/v1/"))
+                .unwrap_or(path)
+                .to_string()
+        } else {
+            path.strip_prefix("/v1/").unwrap_or(path).to_string()
+        };
+
+        let upstream_url = format!("{base_url}{upstream_path}");
+
+        // Build upstream request — preserve original content-type and auth
+        let mut upstream = self.client.post(&upstream_url);
+        if let Some(ref auth) = client_auth {
+            let auth_val = if auth.starts_with("Bearer ") {
+                auth.clone()
+            } else {
+                format!("Bearer {auth}")
+            };
+            upstream = upstream.header("Authorization", auth_val);
+        }
+        upstream = upstream
+            .header("Content-Type", "application/json")
+            .body(body_bytes.to_vec());
+
+        match upstream.send().await {
+            Ok(resp) => {
+                let status = resp.status();
+                let resp_headers = resp.headers().clone();
+                match resp.bytes().await {
+                    Ok(bytes) => {
+                        let mut builder = Response::builder().status(status);
+                        // Copy relevant response headers
+                        if let Some(ct) = resp_headers.get("content-type") {
+                            builder = builder.header("content-type", ct.to_str().unwrap_or("application/json"));
+                        }
+                        let mut resp = builder
+                            .body(BoxBody::new(
+                                Full::new(bytes).map_err(|e: Infallible| match e {}),
+                            ))
+                            .unwrap();
+                        Self::add_cors_headers(&mut resp);
+                        resp
+                    }
+                    Err(e) => Self::error_response(
+                        StatusCode::BAD_GATEWAY,
+                        &format!("Failed to read upstream response: {e}"),
+                    ),
+                }
+            }
+            Err(e) => Self::error_response(
+                StatusCode::BAD_GATEWAY,
+                &format!("Upstream error: {e}"),
+            ),
         }
     }
 
