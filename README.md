@@ -321,6 +321,7 @@ proxy:
   listen: "0.0.0.0:9401"  # Proxy port (0.0.0.0 = all interfaces)
   admin: "0.0.0.0:9400"   # Dashboard port
   timeout_secs: 120
+  bypass: false            # Set true to disable routing/caching/fallback
 
 providers:                # Add/remove as needed
   - name: "deepseek"
@@ -400,11 +401,32 @@ tokenwise --help                     # Show all options
 
 ---
 
+## Deployment
+
+Three options — pick the one that fits:
+
+| Method | When to use |
+|--------|------------|
+| Docker Compose (one command) | Any server with Docker |
+| systemd (bare metal) | VPS without Docker |
+| Caddy + systemd (TLS) | Production with HTTPS |
+
+See [`deploy/README.md`](deploy/README.md) for step-by-step instructions.
+
+Before deploying, run the e2e test:
+
+```bash
+TW_KEY=sk-xxx ./tests/e2e.sh
+# 12 checks — all must pass
+```
+
+---
+
 ## Development
 
 ```bash
 cargo build              # Debug build
-cargo test               # Run 48 tests (36 unit + 12 integration)
+cargo test               # Run 51 tests (36 unit + 15 integration)
 cargo build --release    # Release build
 cargo clippy             # Lint check
 
@@ -459,7 +481,13 @@ templates/
 └── cn/                  # Chinese (zh-CN) equivalents of all 7 pages
 
 deploy/
+├── README.md            # Deployment guide (Docker, systemd, Caddy)
 └── tokenwise.service    # systemd unit file
+
+tests/
+├── e2e.sh               # 12-check delivery test (run before every deploy)
+├── stress.py            # Long-session stress test (large payloads)
+└── integration_tests.rs
 ```
 
 ---
