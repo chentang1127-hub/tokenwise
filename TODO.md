@@ -19,7 +19,8 @@
 ### 🟢 如果你要上线发布
 
 - [x] 部署到生产 VPS（getipgeo.com）✅ 2026-06-23
-- [ ] 更新 README 里的"48 tests"→"51 tests"
+- [x] 更新 README 里的"48 tests"→"51 tests" ✅
+- [x] B 任务：e2e 测试脚本、旁路开关、DELIVERY.md ✅
 - [ ] 清理 `tokenwise.db` 里的真实数据（如果要公开仓库）
 - [ ] 决定是否重命名（TokenWise Core vs 其他名字）
 - [ ] 发布到 Docker Hub
@@ -41,6 +42,7 @@
 
 | 日期 | 做了什么 |
 |------|---------|
+| 6/23 | B 任务全部完成：e2e 测试脚本、旁路开关、长会话压力测试、DELIVERY.md、nginx body size |
 | 6/23 | 🚀 生产部署：getipgeo.com VPS 上线，systemd 服务，nginx 反代 |
 | 6/22 | P5 全部完成：Try It 流式响应、用量告警、数据导出、多 Key 管理、Settings 页面 |
 | 6/21 | P3+P4 完成：Docker 部署、systemd、env override、Backup/Status CLI |
