@@ -48,10 +48,18 @@ nav .lang-toggle { margin-left: auto; border: 1px solid var(--border); padding: 
 .mono { font-family: var(--font-mono); }
 .footer { text-align: center; padding: var(--space-lg); color: var(--muted); font-size: 12px; }
 
+/* Hamburger */
+.hamburger { display: none; cursor: pointer; font-size: 22px; color: var(--muted); background: none; border: none; padding: 4px 8px; }
+.nav-links { display: flex; gap: var(--space-lg); align-items: center; }
+
 /* Responsive */
 @media (max-width: 768px) {
-  nav { gap: var(--space-sm); padding: 0 var(--space-md); overflow-x: auto; }
+  .hamburger { display: block; }
+  .nav-links { display: none; flex-direction: column; position: absolute; top: 56px; left: 0; right: 0; background: var(--card-bg); border-bottom: 1px solid var(--border); padding: var(--space-sm) var(--space-md); z-index: 100; }
+  .nav-links.open { display: flex; }
+  nav { gap: var(--space-sm); padding: 0 var(--space-md); overflow-x: visible; }
   nav a { font-size: 13px; padding: 6px 10px; }
   main { padding: var(--space-md); }
+  .metric-strip { grid-template-columns: repeat(2, 1fr); }
 }
 </style>

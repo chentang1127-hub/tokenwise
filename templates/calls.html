@@ -29,9 +29,15 @@
   /* Export Bar */
   .export-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
 
+  /* Search */
+  .search-box { width: 100%; padding: var(--space-sm) 14px; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; margin-bottom: var(--space-md); font-family: inherit; }
+  .search-box:focus { outline: none; border-color: var(--blue); }
+  .search-box::placeholder { color: var(--muted); opacity: 0.5; }
+
   /* Table */
-  table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; }
-  th { text-align: left; color: var(--muted); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: var(--font-mono); }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; position: sticky; top: 0; background: var(--card-bg); z-index: 1; }
   td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
   tr:hover { background: rgba(255,255,255,0.02); }
   .mono { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; }
@@ -62,11 +68,14 @@
 <body hx-boost="true">
 <nav>
   <span class="brand">⚡ TokenWise Core</span>
+  <button class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
+  <div class="nav-links">
   <a href="/">Dashboard</a>
   <a href="/calls" class="active">Calls</a>
   <a href="/savings">Savings</a>
   <a href="/settings">Settings</a>
   <a href="{{ lang_toggle_url }}" class="lang-toggle">{{ lang_toggle_label }}</a>
+  </div>
 </nav>
 <main>
 
@@ -133,13 +142,16 @@
     <p>Try a wider time range or different filter combination.</p>
   </div>
   {% else %}
-  <!-- Export Bar -->
-  <div class="export-bar">
+  <!-- Search + Export -->
+  <div style="display:flex; gap:12px; margin-bottom:16px;">
+    <input type="text" class="search-box" id="search-input" placeholder="Search model, provider..." oninput="searchTable()" style="flex:1; margin:0" />
+    <div class="export-bar" style="margin:0">
     <span class="filter-label">Export</span>
     <a href="/api/export/calls?format=csv{% if filters.range != "all" %}&range={{ filters.range }}{% endif %}" class="filter-pill">CSV</a>
     <a href="/api/export/calls?format=json{% if filters.range != "all" %}&range={{ filters.range }}{% endif %}" class="filter-pill">JSON</a>
+    </div>
   </div>
-  <table>
+  <div class="table-wrap"><table>
     <thead><tr>
       <th>Model</th>
       <th>Task</th>
@@ -164,7 +176,17 @@
     </tr>
     {% endfor %}
     </tbody>
-  </table>
+  </table></div>
+
+  <script>
+  function searchTable() {
+    var q = document.getElementById('search-input').value.toLowerCase();
+    var rows = document.querySelectorAll('tbody tr');
+    rows.forEach(function(r) {
+      r.style.display = q ? (r.textContent.toLowerCase().includes(q) ? '' : 'none') : '';
+    });
+  }
+  </script>
 
   <!-- Pagination -->
   <div class="pagination">

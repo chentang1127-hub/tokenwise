@@ -78,11 +78,14 @@
 <body hx-boost="true">
 <nav>
   <span class="brand">⚡ TokenWise Core</span>
+  <button class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
+  <div class="nav-links">
   <a href="/" class="active">Dashboard</a>
   <a href="/calls">Calls</a>
   <a href="/savings">Savings</a>
   <a href="/settings">Settings</a>
   <a href="{{ lang_toggle_url }}" class="lang-toggle">{{ lang_toggle_label }}</a>
+  </div>
 </nav>
 <main>
 
