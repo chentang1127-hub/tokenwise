@@ -44,9 +44,10 @@
 
 | 日期 | 做了什么 |
 |------|---------|
-| 6/23 | F1 完成：Telegram Bot 通知（预算告警/超限/日报推送 TG） |
-| 6/23 | F2 确认：数据导出 CSV/JSON 早已存在，验证通过 |
-| 6/23 | TLS/HTTPS：acme.sh + Cloudflare DNS wildcard 证书，8443 端口，Dashboard + Proxy 全部 HTTPS |
+| 6/24 | UI 全面优化：共享 CSS、Dashboard 重设计、Savings 图表、Settings 侧栏、Calls 搜索、移动端 |
+| 6/23 | F1 完成：Telegram Bot 通知 + 异常检测 |
+| 6/23 | TLS/HTTPS：acme.sh + Cloudflare DNS wildcard 证书，8443 端口 |
+| 6/24 | UI 全面优化：共享 CSS、Dashboard 重设计、Savings 图表、Settings 侧栏、Calls 搜索、移动端 |
 | 6/23 | 🚀 生产部署：getipgeo.com VPS 上线，systemd 服务，nginx 反代 |
 | 6/22 | P5 全部完成：Try It 流式响应、用量告警、数据导出、多 Key 管理、Settings 页面 |
 | 6/21 | P3+P4 完成：Docker 部署、systemd、env override、Backup/Status CLI |
