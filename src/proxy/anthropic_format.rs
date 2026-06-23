@@ -372,7 +372,7 @@ impl AnthropicSseState {
             }
         });
         format!(
-            "event: message_start\ndata: {}\n",
+            "event: message_start\ndata: {}\n\n",
             serde_json::to_string(&json).unwrap_or_default()
         )
     }
@@ -387,7 +387,7 @@ impl AnthropicSseState {
             }
         });
         format!(
-            "event: content_block_start\ndata: {}\n",
+            "event: content_block_start\ndata: {}\n\n",
             serde_json::to_string(&json).unwrap_or_default()
         )
     }
@@ -402,7 +402,7 @@ impl AnthropicSseState {
             }
         });
         format!(
-            "event: content_block_delta\ndata: {}\n",
+            "event: content_block_delta\ndata: {}\n\n",
             serde_json::to_string(&json).unwrap_or_default()
         )
     }
@@ -432,14 +432,14 @@ impl AnthropicSseState {
             });
         }
         events.push(format!(
-            "event: message_delta\ndata: {}\n",
+            "event: message_delta\ndata: {}\n\n",
             serde_json::to_string(&delta_json).unwrap_or_default()
         ));
 
         // message_stop
         let stop_json = serde_json::json!({"type": "message_stop"});
         events.push(format!(
-            "event: message_stop\ndata: {}\n",
+            "event: message_stop\ndata: {}\n\n",
             serde_json::to_string(&stop_json).unwrap_or_default()
         ));
 
