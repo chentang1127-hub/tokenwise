@@ -27,8 +27,10 @@
 
 ### 🟡 如果你要继续加功能
 
-- [ ] Alert 通知功能（竞品有，我们没有）
+- [x] Alert Telegram 通知 ✅ 2026-06-23
+- [x] 数据导出 CSV/JSON ✅ 已存在
 - [ ] 看 [PROJECT_STATUS.md](PROJECT_STATUS.md) 战略摘要 — Phase 4 功能补齐
+- [ ] Docker Hub 发布
 
 ### 🔵 如果你想学习代码
 
@@ -42,6 +44,8 @@
 
 | 日期 | 做了什么 |
 |------|---------|
+| 6/23 | F1 完成：Telegram Bot 通知（预算告警/超限/日报推送 TG） |
+| 6/23 | F2 确认：数据导出 CSV/JSON 早已存在，验证通过 |
 | 6/23 | B 任务全部完成：e2e 测试脚本、旁路开关、长会话压力测试、DELIVERY.md、nginx body size |
 | 6/23 | 🚀 生产部署：getipgeo.com VPS 上线，systemd 服务，nginx 反代 |
 | 6/22 | P5 全部完成：Try It 流式响应、用量告警、数据导出、多 Key 管理、Settings 页面 |
