@@ -124,14 +124,22 @@ if ! grep -q "listen $HTTPS_PORT ssl" "$NGINX_CONF" 2>/dev/null; then
         }
     }"
 
-    # Insert before the closing }
-    sed -i "/^}/i $HTTPS_BLOCK" "$NGINX_CONF"
+    # Note: sed insert may fail with complex multi-line blocks.
+    # If so, manually edit the nginx config or use the complete config
+    # template in this repo.
+    cp "$NGINX_CONF" "${NGINX_CONF}.pre-tls"
+    echo "⚠️  Auto-insert may fail. If nginx fails to start, restore from ${NGINX_CONF}.pre-tls"
+    echo "   and add the HTTPS blocks manually. See deploy/README.md for the template."
 
-    # Add port 8443 mapping to docker-compose
+    # Add port 8443 mapping + cert volume mount to docker-compose
     COMPOSE="/opt/ipgeo/docker-compose.yml"
     if ! grep -q "$HTTPS_PORT:$HTTPS_PORT" "$COMPOSE" 2>/dev/null; then
         cp "$COMPOSE" "${COMPOSE}.bak"
         sed -i "/- \"80:80\"/a\\      - \"$HTTPS_PORT:$HTTPS_PORT\"" "$COMPOSE"
+    fi
+    # Mount SSL certs into nginx container
+    if ! grep -q "$CERT_DIR:$CERT_DIR" "$COMPOSE" 2>/dev/null; then
+        sed -i "s|- ./docs:/app/docs:ro|- ./docs:/app/docs:ro\n      - $CERT_DIR:$CERT_DIR:ro|" "$COMPOSE"
     fi
 
     echo "Nginx config updated. Restarting..."
