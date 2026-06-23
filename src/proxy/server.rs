@@ -183,12 +183,13 @@ impl ProxyService {
             ));
         };
 
-        // ── Bypass mode: pure transparent passthrough ──────────
-        // When enabled, skip ALL smart logic (routing, caching, translation).
-        // TokenWise becomes a dumb pipe — forwards request and response as-is.
-        if self.cfg.proxy.bypass {
-            return Ok(self.handle_bypass(req, &path, force_provider).await);
-        }
+        // ── Bypass mode ───────────────────────────────────────
+        // When bypass is true, all smart features are disabled for
+        // this request. TokenWise still translates formats (Anthropic↔OpenAI)
+        // but skips routing, caching, and fallback.
+        let routing_enabled = self.routing_enabled && !self.cfg.proxy.bypass;
+        let cache_enabled = routing_enabled; // cache requires Pro routing
+        let safety_enabled = self.cfg.safety_net.enabled && !self.cfg.proxy.bypass;
 
         // Budget check: block requests if daily/monthly limit exceeded
         if self.cfg.budget.daily_limit_usd > 0.0 || self.cfg.budget.monthly_limit_usd > 0.0 {
@@ -345,7 +346,7 @@ impl ProxyService {
                     api_key: String::new(),
                     tier: route.tier,
                 };
-                if self.routing_enabled {
+                if routing_enabled {
                     // Pro: try to pick the cheapest model within the forced provider
                     if let Some(within) = route_within_provider(complexity, &self.cfg, fp) {
                         let m = within.model.clone();
@@ -356,7 +357,7 @@ impl ProxyService {
                 } else {
                     (provider_route, original_model.to_string(), false)
                 }
-            } else if self.routing_enabled {
+            } else if routing_enabled {
                 // Pro: pick the cheapest model in the appropriate tier,
                 // BUT constrained to the user's original provider.
                 // In zero-trust mode the client's API key only works
@@ -387,7 +388,7 @@ impl ProxyService {
             .and_then(|s| s.as_bool())
             .unwrap_or(false);
 
-        let cache_hash = if self.routing_enabled && !is_stream {
+        let cache_hash = if routing_enabled && !is_stream {
             let messages_str = serde_json::to_string(&messages).unwrap_or_default();
             let cache_input = format!("{}:{}", routed_model_id, messages_str);
             Some(CallRecord::hash_prompt(&cache_input))
@@ -794,7 +795,7 @@ impl ProxyService {
             // ── Safety net: check for empty/truncated responses ──────
             let (mut actual_route_ns, mut fallback_used_ns, mut latency_ms_ns) =
                 (actual_route.clone(), fallback_used, latency_ms);
-            if self.cfg.safety_net.enabled && !fallback_used {
+            if safety_enabled && !fallback_used {
                 let needs_fallback = self.check_empty_or_truncated(&resp_bytes);
                 if needs_fallback {
                     warn!(
@@ -941,122 +942,6 @@ impl ProxyService {
         }
     }
 
-    /// Bypass mode handler — pure transparent proxy.
-    /// No format translation, no routing, no caching. Just forward and return.
-    async fn handle_bypass(
-        &self,
-        req: Request<Incoming>,
-        path: &str,
-        force_provider: Option<String>,
-    ) -> Response<BoxBody<Bytes, String>> {
-        // Extract auth
-        let client_auth = req
-            .headers()
-            .get("Authorization")
-            .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string())
-            .or_else(|| {
-                req.headers()
-                    .get("x-api-key")
-                    .and_then(|v| v.to_str().ok())
-                    .map(|s| format!("Bearer {s}"))
-            });
-
-        // Collect body
-        let (_parts, body) = req.into_parts();
-        let body_bytes = match body.collect().await {
-            Ok(c) => c.to_bytes(),
-            Err(e) => {
-                return Self::error_response(
-                    StatusCode::BAD_REQUEST,
-                    &format!("Failed to read body: {e}"),
-                );
-            }
-        };
-
-        // Determine provider
-        let provider_name = if let Some(ref fp) = force_provider {
-            fp.clone()
-        } else if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&body_bytes)
-            && let Some(model) = json.get("model").and_then(|v| v.as_str())
-        {
-            // Look up provider by model name
-            self.cfg
-                .providers
-                .iter()
-                .find(|p| p.models.iter().any(|m| m.id == model))
-                .map(|p| p.name.clone())
-                .unwrap_or_else(|| self.cfg.providers.first().unwrap().name.clone())
-        } else {
-            self.cfg.providers.first().unwrap().name.clone()
-        };
-
-        let base_url = self
-            .cfg
-            .providers
-            .iter()
-            .find(|p| p.name == provider_name)
-            .map(|p| p.base_url.clone())
-            .unwrap_or_else(|| "https://api.deepseek.com/v1".to_string());
-
-        // Build upstream path: strip /v1/ and optional provider prefix
-        let upstream_path = if let Some(ref fp) = force_provider {
-            path.strip_prefix(&format!("/v1/{fp}"))
-                .or_else(|| path.strip_prefix("/v1/"))
-                .unwrap_or(path)
-                .to_string()
-        } else {
-            path.strip_prefix("/v1/").unwrap_or(path).to_string()
-        };
-
-        let upstream_url = format!("{base_url}{upstream_path}");
-
-        // Build upstream request — preserve original content-type and auth
-        let mut upstream = self.client.post(&upstream_url);
-        if let Some(ref auth) = client_auth {
-            let auth_val = if auth.starts_with("Bearer ") {
-                auth.clone()
-            } else {
-                format!("Bearer {auth}")
-            };
-            upstream = upstream.header("Authorization", auth_val);
-        }
-        upstream = upstream
-            .header("Content-Type", "application/json")
-            .body(body_bytes.to_vec());
-
-        match upstream.send().await {
-            Ok(resp) => {
-                let status = resp.status();
-                let resp_headers = resp.headers().clone();
-                match resp.bytes().await {
-                    Ok(bytes) => {
-                        let mut builder = Response::builder().status(status);
-                        // Copy relevant response headers
-                        if let Some(ct) = resp_headers.get("content-type") {
-                            builder = builder.header("content-type", ct.to_str().unwrap_or("application/json"));
-                        }
-                        let mut resp = builder
-                            .body(BoxBody::new(
-                                Full::new(bytes).map_err(|e: Infallible| match e {}),
-                            ))
-                            .unwrap();
-                        Self::add_cors_headers(&mut resp);
-                        resp
-                    }
-                    Err(e) => Self::error_response(
-                        StatusCode::BAD_GATEWAY,
-                        &format!("Failed to read upstream response: {e}"),
-                    ),
-                }
-            }
-            Err(e) => Self::error_response(
-                StatusCode::BAD_GATEWAY,
-                &format!("Upstream error: {e}"),
-            ),
-        }
-    }
-
     /// Resolve the original client-requested model to a provider route.
     /// Used by Free tier (passthrough mode) — the provider/model are used for
     /// cost calculation and base_url resolution only. The actual Authorization
@@ -1150,7 +1035,7 @@ impl ProxyService {
 
                 // Only fallback on 5xx (server errors), NOT 4xx (auth/bad request).
                 // Fallback is a safety net for model failures, not for invalid API keys.
-                if self.cfg.safety_net.enabled && status_code.is_server_error() {
+                if self.cfg.safety_net.enabled && !self.cfg.proxy.bypass && status_code.is_server_error() {
                     warn!(
                         "Upstream {} returned {status_code}, attempting fallback...",
                         route.model
@@ -1225,7 +1110,7 @@ impl ProxyService {
 
                 // Use provider-constrained fallback first (zero-trust compatible),
                 // then try global as last resort.
-                let fb_opt2 = if self.cfg.safety_net.enabled {
+                let fb_opt2 = if self.cfg.safety_net.enabled && !self.cfg.proxy.bypass {
                     fallback_route_within_provider(&route.tier, &self.cfg, &route.provider)
                         .or_else(|| fallback_route(&route.tier, &self.cfg))
                 } else {
